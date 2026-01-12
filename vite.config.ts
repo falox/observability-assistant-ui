@@ -9,7 +9,7 @@ export default defineConfig({
     proxy: {
       // Proxy ag-ui requests to your backend
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:5050',
         changeOrigin: true,
       },
     },

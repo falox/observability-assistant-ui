@@ -4,11 +4,11 @@ import { useAgUiStream } from './hooks/useAgUiStream'
 import type { ChatMessage, ToolCall, Step } from './types/agui'
 
 // Demo mode: simulate ag-ui events for testing UI without a backend
-const DEMO_MODE = true
+const DEMO_MODE = false
 
 function App() {
   // Real ag-ui streaming hook
-  const agUi = useAgUiStream({ endpoint: '/api/chat' })
+  const agUi = useAgUiStream({ endpoint: '/api/agui/chat' })
 
   // Demo state for testing without backend
   const [demoMessages, setDemoMessages] = useState<ChatMessage[]>([])

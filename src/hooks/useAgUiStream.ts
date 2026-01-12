@@ -190,7 +190,10 @@ export function useAgUiStream(
             Accept: 'text/event-stream',
           },
           body: JSON.stringify({
+            threadId: `thread-${Date.now()}`,
+            runId: `run-${Date.now()}`,
             messages: [...messages, userMessage].map((m) => ({
+              id: m.id,
               role: m.role,
               content: m.content,
             })),
