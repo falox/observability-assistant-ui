@@ -183,21 +183,28 @@ export function useAgUiStream(
       abortControllerRef.current = new AbortController()
 
       try {
+        const requestBody = {
+          threadId: `thread-${Date.now()}`,
+          runId: `run-${Date.now()}`,
+          messages: [...messages, userMessage].map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+          })),
+          state: {},
+          tools: [],
+          context: [],
+          forwardedProps: {},
+        }
+        console.log('[AG-UI] OUT:', requestBody)
+
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Accept: 'text/event-stream',
           },
-          body: JSON.stringify({
-            threadId: `thread-${Date.now()}`,
-            runId: `run-${Date.now()}`,
-            messages: [...messages, userMessage].map((m) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-            })),
-          }),
+          body: JSON.stringify(requestBody),
           signal: abortControllerRef.current.signal,
         })
 
@@ -230,9 +237,10 @@ export function useAgUiStream(
 
               try {
                 const event = JSON.parse(data) as AgUiEvent
+                console.log('[AG-UI] IN:', event)
                 handleEvent(event)
               } catch {
-                console.warn('Failed to parse event:', data)
+                console.warn('[AG-UI] Failed to parse event:', data)
               }
             }
           }
