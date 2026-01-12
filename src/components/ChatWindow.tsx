@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import {
   Chatbot,
   ChatbotDisplayMode,
@@ -32,14 +32,6 @@ export function ChatWindow({
   onClearMessages,
 }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('')
-  const contentRef = useRef<HTMLDivElement>(null)
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    if (contentRef.current) {
-      contentRef.current.scrollTop = contentRef.current.scrollHeight
-    }
-  }, [messages])
 
   const handleSend = (message: string | number) => {
     const text = String(message).trim()
@@ -73,7 +65,7 @@ export function ChatWindow({
         </ChatbotHeaderActions>
       </ChatbotHeader>
 
-      <ChatbotContent ref={contentRef}>
+      <ChatbotContent>
         <MessageList messages={messages} isStreaming={isStreaming} />
       </ChatbotContent>
 
