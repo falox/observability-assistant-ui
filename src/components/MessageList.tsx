@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import {
   Message,
   MessageBox,
@@ -26,6 +27,13 @@ interface MessageListProps {
 }
 
 export function MessageList({ messages, isStreaming }: MessageListProps) {
+  const scrollToBottomRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, isStreaming])
+
   return (
     <MessageBox>
       {messages.map((message) => (
@@ -103,6 +111,8 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
       {isStreaming && messages.length > 0 && messages[messages.length - 1]?.role === 'user' && (
         <LoadingMessage />
       )}
+      {/* Auto-scroll anchor */}
+      <div ref={scrollToBottomRef} />
     </MessageBox>
   )
 }
