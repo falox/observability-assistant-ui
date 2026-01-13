@@ -13,7 +13,7 @@ import {
   MessageBar,
 } from '@patternfly/chatbot'
 import { DropdownList, DropdownItem, DropdownGroup, Divider } from '@patternfly/react-core'
-import { TimesIcon, SunIcon, MoonIcon, AdjustIcon } from '@patternfly/react-icons'
+import { TimesIcon, SunIcon, MoonIcon, AdjustIcon, FlaskIcon, ServerIcon } from '@patternfly/react-icons'
 import { MessageList } from './MessageList'
 import type { ChatMessage } from '../types/agui'
 
@@ -23,6 +23,8 @@ interface ChatWindowProps {
   error: string | null
   onSendMessage: (content: string) => void
   onClearMessages: () => void
+  isDemoMode: boolean
+  onToggleMode: () => void
 }
 
 type Theme = 'light' | 'dark' | 'system'
@@ -43,6 +45,8 @@ export function ChatWindow({
   error,
   onSendMessage,
   onClearMessages,
+  isDemoMode,
+  onToggleMode,
 }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('')
   const [theme, setTheme] = useState<Theme>(getStoredTheme)
@@ -104,6 +108,29 @@ export function ChatWindow({
         </ChatbotHeaderMain>
         <ChatbotHeaderActions>
           <ChatbotHeaderOptionsDropdown onSelect={onSelectTheme}>
+            <DropdownGroup label="Mode">
+              <DropdownList>
+                <DropdownItem
+                  value="demo"
+                  key="mode-demo"
+                  icon={<FlaskIcon aria-hidden />}
+                  isSelected={isDemoMode}
+                  onClick={isDemoMode ? undefined : onToggleMode}
+                >
+                  Demo
+                </DropdownItem>
+                <DropdownItem
+                  value="prod"
+                  key="mode-prod"
+                  icon={<ServerIcon aria-hidden />}
+                  isSelected={!isDemoMode}
+                  onClick={isDemoMode ? onToggleMode : undefined}
+                >
+                  Production
+                </DropdownItem>
+              </DropdownList>
+            </DropdownGroup>
+            <Divider />
             <DropdownGroup label="Theme">
               <DropdownList>
                 <DropdownItem

@@ -3,10 +3,26 @@ import { ChatWindow } from './components/ChatWindow'
 import { useAgUiStream } from './hooks/useAgUiStream'
 import type { ChatMessage, ToolCall, Step } from './types/agui'
 
-// Demo mode: simulate ag-ui events for testing UI without a backend
-const DEMO_MODE = false
+const MODE_STORAGE_KEY = 'app-mode'
+
+function getStoredMode(): boolean {
+  const stored = localStorage.getItem(MODE_STORAGE_KEY)
+  // Default to demo mode if not set
+  return stored !== 'prod'
+}
 
 function App() {
+  // Demo/Prod mode toggle
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(getStoredMode)
+
+  const toggleMode = useCallback(() => {
+    setIsDemoMode((prev) => {
+      const newMode = !prev
+      localStorage.setItem(MODE_STORAGE_KEY, newMode ? 'demo' : 'prod')
+      return newMode
+    })
+  }, [])
+
   // Real ag-ui streaming hook
   const agUi = useAgUiStream({ endpoint: '/api/agui/chat' })
 
@@ -126,17 +142,17 @@ Would you like me to check any specific pods or services?`
     setDemoStreaming(false)
   }, [])
 
-  const handleSendMessage = DEMO_MODE
+  const handleSendMessage = isDemoMode
     ? simulateAgUiStream
     : agUi.sendMessage
 
-  const handleClearMessages = DEMO_MODE
+  const handleClearMessages = isDemoMode
     ? () => setDemoMessages([])
     : agUi.clearMessages
 
-  const messages = DEMO_MODE ? demoMessages : agUi.messages
-  const isStreaming = DEMO_MODE ? demoStreaming : agUi.isStreaming
-  const error = DEMO_MODE ? null : agUi.error
+  const messages = isDemoMode ? demoMessages : agUi.messages
+  const isStreaming = isDemoMode ? demoStreaming : agUi.isStreaming
+  const error = isDemoMode ? null : agUi.error
 
   return (
     <ChatWindow
@@ -145,6 +161,8 @@ Would you like me to check any specific pods or services?`
       error={error}
       onSendMessage={handleSendMessage}
       onClearMessages={handleClearMessages}
+      isDemoMode={isDemoMode}
+      onToggleMode={toggleMode}
     />
   )
 }
