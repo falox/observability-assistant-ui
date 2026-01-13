@@ -137,7 +137,7 @@ export function useAgUiStream(
         case 'TOOL_CALL_RESULT': {
           const toolCall = toolCallsRef.current.get(event.toolCallId)
           if (toolCall) {
-            toolCall.result = event.result
+            toolCall.result = event.content
             toolCall.isLoading = false
             updateCurrentMessage({
               toolCalls: Array.from(toolCallsRef.current.values()),

@@ -81,7 +81,9 @@ export interface ToolCallEndEvent extends BaseEvent {
 export interface ToolCallResultEvent extends BaseEvent {
   type: 'TOOL_CALL_RESULT'
   toolCallId: string
-  result: string
+  content: string // ag-ui standard field
+  messageId?: string
+  role?: string
 }
 
 export interface StepStartedEvent extends BaseEvent {
