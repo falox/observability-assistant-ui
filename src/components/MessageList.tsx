@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import {
   Message,
   MessageBox,
-  LoadingMessage,
 } from '@patternfly/chatbot'
 import {
   ExpandableSection,
@@ -36,16 +35,28 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
 
   return (
     <MessageBox>
-      {messages.map((message) => (
-        <Message
-          key={message.id}
-          role={message.role === 'user' ? 'user' : 'bot'}
-          name={message.role === 'user' ? 'You' : 'Assistant'}
-          avatar={message.role === 'user' ? userAvatar : patternflyAvatar}
-          avatarProps={message.role === 'user' ? { isBordered: true } : undefined}
-          content={message.content || undefined}
-          isLoading={message.isStreaming && !message.content}
-          extraContent={{
+      {messages.map((message) => {
+        // Don't render empty streaming assistant messages - show LoadingMessage instead
+        const isEmptyStreamingAssistant =
+          message.role === 'assistant' &&
+          message.isStreaming &&
+          !message.content &&
+          (!message.toolCalls || message.toolCalls.length === 0) &&
+          (!message.steps || message.steps.length === 0)
+
+        if (isEmptyStreamingAssistant) {
+          return null
+        }
+
+        return (
+          <Message
+            key={message.id}
+            role={message.role === 'user' ? 'user' : 'bot'}
+            name={message.role === 'user' ? 'You' : 'Assistant'}
+            avatar={message.role === 'user' ? userAvatar : patternflyAvatar}
+            avatarProps={message.role === 'user' ? { isBordered: true } : undefined}
+            content={message.content || undefined}
+            extraContent={{
             afterMainContent: (
               <>
                 {/* Steps / Thinking */}
@@ -105,12 +116,29 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
             ),
           }}
         />
-      ))}
+        )
+      })}
 
-      {/* Show loading indicator when streaming but no assistant message yet */}
-      {isStreaming && messages.length > 0 && messages[messages.length - 1]?.role === 'user' && (
-        <LoadingMessage />
-      )}
+      {/* Show loading indicator when streaming and no visible assistant content yet */}
+      {isStreaming && (() => {
+        const lastMessage = messages[messages.length - 1]
+        // Show loading if last message is user, or if last message is empty streaming assistant
+        const showLoading =
+          lastMessage?.role === 'user' ||
+          (lastMessage?.role === 'assistant' &&
+            lastMessage.isStreaming &&
+            !lastMessage.content &&
+            (!lastMessage.toolCalls || lastMessage.toolCalls.length === 0) &&
+            (!lastMessage.steps || lastMessage.steps.length === 0))
+        return showLoading ? (
+          <Message
+            role="bot"
+            name="Assistant"
+            avatar={patternflyAvatar}
+            isLoading
+          />
+        ) : null
+      })()}
       {/* Auto-scroll anchor */}
       <div ref={scrollToBottomRef} />
     </MessageBox>

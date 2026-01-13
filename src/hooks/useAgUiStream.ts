@@ -27,6 +27,24 @@ export function useAgUiStream(
   const toolCallsRef = useRef<Map<string, ToolCall>>(new Map())
   const stepsRef = useRef<Map<string, Step>>(new Map())
 
+  // Ensures an assistant message exists, creating one if needed
+  const ensureAssistantMessage = useCallback(() => {
+    if (!currentMessageRef.current) {
+      const newMessage: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+        toolCalls: [],
+        steps: [],
+      }
+      currentMessageRef.current = newMessage
+      toolCallsRef.current.clear()
+      stepsRef.current.clear()
+      setMessages((prev) => [...prev, newMessage])
+    }
+  }, [])
+
   const updateCurrentMessage = useCallback((updates: Partial<ChatMessage>) => {
     if (!currentMessageRef.current) return
 
@@ -35,12 +53,19 @@ export function useAgUiStream(
       ...updates,
     }
 
+    const updatedMessage = { ...currentMessageRef.current }
+
     setMessages((prev) => {
-      const lastIndex = prev.length - 1
-      if (lastIndex < 0) return prev
+      // Find the message by ID, not by position
+      const messageIndex = prev.findIndex((m) => m.id === updatedMessage.id)
+      if (messageIndex === -1) {
+        // Message not in state yet, add it
+        return [...prev, updatedMessage]
+      }
       return [
-        ...prev.slice(0, lastIndex),
-        { ...currentMessageRef.current! },
+        ...prev.slice(0, messageIndex),
+        updatedMessage,
+        ...prev.slice(messageIndex + 1),
       ]
     })
   }, [])
@@ -65,11 +90,10 @@ export function useAgUiStream(
         }
 
         case 'TEXT_MESSAGE_CONTENT': {
-          if (currentMessageRef.current) {
-            updateCurrentMessage({
-              content: currentMessageRef.current.content + event.delta,
-            })
-          }
+          ensureAssistantMessage()
+          updateCurrentMessage({
+            content: (currentMessageRef.current?.content || '') + event.delta,
+          })
           break
         }
 
@@ -80,6 +104,7 @@ export function useAgUiStream(
         }
 
         case 'TOOL_CALL_START': {
+          ensureAssistantMessage()
           const toolCall: ToolCall = {
             id: event.toolCallId,
             name: event.toolName,
@@ -128,6 +153,7 @@ export function useAgUiStream(
         }
 
         case 'STEP_STARTED': {
+          ensureAssistantMessage()
           const step: Step = {
             id: event.stepId || event.stepName,
             name: event.stepName,
@@ -164,7 +190,7 @@ export function useAgUiStream(
         }
       }
     },
-    [updateCurrentMessage]
+    [ensureAssistantMessage, updateCurrentMessage]
   )
 
   const sendMessage = useCallback(
