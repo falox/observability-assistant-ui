@@ -129,14 +129,15 @@ function App() {
       await delay(200)
     }
 
-    // Parse input as space-separated commands: step, tool, text
+    // Parse input as space-separated commands: step, tool, text, code
     const commands = userContent.toLowerCase().trim().split(/\s+/)
-    const validCommands = ['step', 'tool', 'text']
+    const validCommands = ['step', 'tool', 'text', 'code']
     const hasValidCommands = commands.some(cmd => validCommands.includes(cmd))
 
     if (hasValidCommands) {
       let toolIndex = 0
       let textIndex = 0
+      let codeIndex = 0
       const toolVariants = [
         { name: 'get_cluster_metrics', args: { cluster: 'prod-east' }, result: { cpu: '45%', memory: '62%' } },
         { name: 'get_pod_status', args: { namespace: 'default' }, result: { running: 12, pending: 0 } },
@@ -146,6 +147,11 @@ function App() {
         'Here is some information based on the analysis.',
         'The cluster is operating normally with healthy resource usage.',
         'All systems are functioning as expected.',
+      ]
+      const codeVariants = [
+        `Here is the cluster configuration:\n\n\`\`\`yaml\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: cluster-config\n  namespace: openshift-config\ndata:\n  monitoring.enabled: "true"\n  alerting.threshold: "80"\n\`\`\`\n\n`,
+        `The pod logs show the following output:\n\n\`\`\`\nE0113 17:25:22.228814 2290994 memcache.go:265] couldn't get current server API group list\nE0113 17:25:22.230050 2290994 memcache.go:265] connection refused\nE0113 17:25:22.231350 2290994 memcache.go:265] retrying in 5 seconds\n\`\`\`\n\n`,
+        `You can run this command to check the status:\n\n\`\`\`bash\nkubectl get pods -n openshift-monitoring \\\n  -o custom-columns=NAME:.metadata.name,STATUS:.status.phase,RESTARTS:.status.containerStatuses[0].restartCount\n\`\`\`\n\n`,
       ]
 
       for (const cmd of commands) {
@@ -159,11 +165,15 @@ function App() {
           const text = textVariants[textIndex % textVariants.length]
           await streamText(text + '\n\n')
           textIndex++
+        } else if (cmd === 'code') {
+          const codeText = codeVariants[codeIndex % codeVariants.length]
+          await streamText(codeText)
+          codeIndex++
         }
       }
     } else {
       // Default: show help
-      await streamText(`You said: "${userContent}"\n\nThis is a demo. Type a space-separated sequence of:\n- **step** - show steps\n- **tool** - show tool call\n- **text** - show text\n\nExample: \`step text tool text\``)
+      await streamText(`You said: "${userContent}"\n\nThis is a demo. Type a space-separated sequence of:\n- **step** - show steps\n- **tool** - show tool call\n- **text** - show text\n- **code** - show text with code block\n\nExample: \`step text code tool\``)
     }
 
     // End streaming
