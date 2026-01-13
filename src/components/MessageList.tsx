@@ -20,7 +20,6 @@ import {
 import {
   CheckCircleIcon,
   OutlinedCircleIcon,
-  WrenchIcon,
   CopyIcon,
   CheckIcon,
 } from '@patternfly/react-icons'
@@ -122,7 +121,57 @@ function StepsList({ steps }: { steps: Step[] }) {
 // Style for code blocks inside tool responses to prevent overflow
 const toolCodeBlockStyle: React.CSSProperties = {
   maxWidth: '100%',
+  maxHeight: '200px',
   overflow: 'auto',
+}
+
+// Individual tool call item with controlled expanded state (collapsed by default)
+function ToolCallItem({ toolCall }: { toolCall: ToolCall }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  const onToggle = (_event: React.MouseEvent, expanded: boolean) => {
+    setIsExpanded(expanded)
+  }
+
+  return (
+    <ToolResponse
+      toggleContent={
+        <span>
+          {toolCall.isLoading && <Spinner size="sm" />} {toolCall.name}
+        </span>
+      }
+      body={toolCall.result ? 'Tool execution completed.' : undefined}
+      cardTitle={toolCall.name}
+      cardBody={
+        <div style={{ maxWidth: '100%', overflow: 'hidden' }}>
+          {toolCall.args && (
+            <div style={{ marginBottom: '0.5rem' }}>
+              <strong>Parameters</strong>
+              <div className="tool-code-block-scroll" style={toolCodeBlockStyle}>
+                <CodeBlock>
+                  <CodeBlockCode>{toolCall.args}</CodeBlockCode>
+                </CodeBlock>
+              </div>
+            </div>
+          )}
+          {toolCall.result && (
+            <div>
+              <strong>Response</strong>
+              <div className="tool-code-block-scroll" style={toolCodeBlockStyle}>
+                <CodeBlock>
+                  <CodeBlockCode>{toolCall.result}</CodeBlockCode>
+                </CodeBlock>
+              </div>
+            </div>
+          )}
+        </div>
+      }
+      expandableSectionProps={{
+        isExpanded,
+        onToggle,
+      }}
+    />
+  )
 }
 
 // Component for tool calls
@@ -130,52 +179,7 @@ function ToolCallsList({ toolCalls }: { toolCalls: ToolCall[] }) {
   return (
     <div style={{ marginTop: '1rem', maxWidth: '100%', overflow: 'hidden' }}>
       {toolCalls.map((toolCall) => (
-        <ToolResponse
-          key={toolCall.id}
-          toggleContent={
-            <span>
-              {toolCall.isLoading ? (
-                <>
-                  <Spinner size="sm" /> Running: {toolCall.name}...
-                </>
-              ) : (
-                <>
-                  <WrenchIcon /> Tool response: {toolCall.name}
-                </>
-              )}
-            </span>
-          }
-          body={toolCall.result ? 'Tool execution completed.' : undefined}
-          cardTitle={
-            <span>
-              <WrenchIcon /> {toolCall.name}
-            </span>
-          }
-          cardBody={
-            <div style={{ maxWidth: '100%', overflow: 'hidden' }}>
-              {toolCall.args && (
-                <div style={{ marginBottom: '0.5rem' }}>
-                  <strong>Parameters</strong>
-                  <div style={toolCodeBlockStyle}>
-                    <CodeBlock>
-                      <CodeBlockCode>{toolCall.args}</CodeBlockCode>
-                    </CodeBlock>
-                  </div>
-                </div>
-              )}
-              {toolCall.result && (
-                <div>
-                  <strong>Response</strong>
-                  <div style={toolCodeBlockStyle}>
-                    <CodeBlock>
-                      <CodeBlockCode>{toolCall.result}</CodeBlockCode>
-                    </CodeBlock>
-                  </div>
-                </div>
-              )}
-            </div>
-          }
-        />
+        <ToolCallItem key={toolCall.id} toolCall={toolCall} />
       ))}
     </div>
   )

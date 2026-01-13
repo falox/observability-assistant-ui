@@ -12,3 +12,11 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+/* Tool response code blocks: no text wrap, scrollable */
+.tool-code-block-scroll pre,
+.tool-code-block-scroll code {
+  white-space: pre !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
