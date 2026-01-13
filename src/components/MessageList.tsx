@@ -15,6 +15,10 @@ import {
   ProgressStepper,
   ProgressStep,
   Content,
+  ContentVariants,
+  List,
+  ListItem,
+  ListComponent,
   getUniqueId,
 } from '@patternfly/react-core'
 import {
@@ -77,9 +81,25 @@ function CodeBlockWithCopy({ children, className }: { children: React.ReactNode;
 
 // Custom components for ReactMarkdown to use PatternFly styling
 const markdownComponents: Components = {
+  p: ({ children }) => (
+    <span className="pf-chatbot__message-text">
+      <Content component={ContentVariants.p}>{children}</Content>
+    </span>
+  ),
   code: ({ children, className }) => (
     <CodeBlockWithCopy className={className}>{children}</CodeBlockWithCopy>
   ),
+  ul: ({ children }) => (
+    <div className="pf-chatbot__message-unordered-list">
+      <List>{children}</List>
+    </div>
+  ),
+  ol: ({ children }) => (
+    <div className="pf-chatbot__message-ordered-list">
+      <List component={ListComponent.ol}>{children}</List>
+    </div>
+  ),
+  li: ({ children }) => <ListItem>{children}</ListItem>,
 }
 
 // Separate component for steps to manage expanded state
@@ -201,9 +221,9 @@ function ContentBlockRenderer({
         switch (block.type) {
           case 'text':
             return block.content ? (
-              <Content key={block.id}>
-                <ReactMarkdown components={markdownComponents}>{block.content}</ReactMarkdown>
-              </Content>
+              <ReactMarkdown key={block.id} components={markdownComponents}>
+                {block.content}
+              </ReactMarkdown>
             ) : null
           case 'steps':
             return steps.length > 0 ? <StepsList key={block.id} steps={steps} /> : null
