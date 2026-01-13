@@ -11,12 +11,14 @@ import {
   Spinner,
   ProgressStepper,
   ProgressStep,
+  Content,
 } from '@patternfly/react-core'
 import {
   CheckCircleIcon,
   OutlinedCircleIcon,
   WrenchIcon,
 } from '@patternfly/react-icons'
+import ReactMarkdown from 'react-markdown'
 import type { ChatMessage, Step, ToolCall, ContentBlock } from '../types/agui'
 
 // Standard PatternFly chatbot avatars
@@ -111,7 +113,7 @@ function ToolCallsList({ toolCalls }: { toolCalls: ToolCall[] }) {
   )
 }
 
-// Render content blocks (steps/tools only, text is handled separately)
+// Render all content blocks in order (text, steps, tools)
 function ContentBlockRenderer({
   blocks,
   steps,
@@ -126,8 +128,11 @@ function ContentBlockRenderer({
       {blocks.map((block) => {
         switch (block.type) {
           case 'text':
-            // Text is rendered via the content prop, skip here
-            return null
+            return block.content ? (
+              <Content key={block.id}>
+                <ReactMarkdown>{block.content}</ReactMarkdown>
+              </Content>
+            ) : null
           case 'steps':
             return steps.length > 0 ? <StepsList key={block.id} steps={steps} /> : null
           case 'tools':
@@ -140,21 +145,6 @@ function ContentBlockRenderer({
   )
 }
 
-// Split content blocks into before and after the first text block
-function splitContentBlocks(blocks: ContentBlock[]): {
-  beforeText: ContentBlock[]
-  afterText: ContentBlock[]
-} {
-  const firstTextIndex = blocks.findIndex((b) => b.type === 'text')
-  if (firstTextIndex === -1) {
-    // No text block, everything goes before
-    return { beforeText: blocks, afterText: [] }
-  }
-  return {
-    beforeText: blocks.slice(0, firstTextIndex),
-    afterText: blocks.slice(firstTextIndex + 1), // Skip the text block itself
-  }
-}
 
 interface MessageListProps {
   messages: ChatMessage[]
@@ -185,13 +175,32 @@ export function MessageList({ messages, isStreaming, runActive }: MessageListPro
           return null
         }
 
-        // Split content blocks into before/after text for proper positioning
-        const { beforeText, afterText } = message.contentBlocks && message.contentBlocks.length > 0
-          ? splitContentBlocks(message.contentBlocks)
-          : { beforeText: [], afterText: [] }
-
         const hasContentBlocks = message.contentBlocks && message.contentBlocks.length > 0
 
+        // When we have content blocks, render ALL content (including text) via beforeMainContent
+        // to preserve the correct ordering. Don't use the content prop in this case.
+        if (hasContentBlocks) {
+          return (
+            <Message
+              key={message.id}
+              role={message.role === 'user' ? 'user' : 'bot'}
+              name={message.role === 'user' ? 'You' : 'Assistant'}
+              avatar={message.role === 'user' ? userAvatar : patternflyAvatar}
+              avatarProps={message.role === 'user' ? { isBordered: true } : undefined}
+              extraContent={{
+                beforeMainContent: (
+                  <ContentBlockRenderer
+                    blocks={message.contentBlocks!}
+                    steps={message.steps || []}
+                    toolCalls={message.toolCalls || []}
+                  />
+                ),
+              }}
+            />
+          )
+        }
+
+        // Fallback for messages without contentBlocks (user messages, old format)
         return (
           <Message
             key={message.id}
@@ -201,34 +210,18 @@ export function MessageList({ messages, isStreaming, runActive }: MessageListPro
             avatarProps={message.role === 'user' ? { isBordered: true } : undefined}
             content={message.content || undefined}
             extraContent={{
-            beforeMainContent: hasContentBlocks && beforeText.length > 0 ? (
-              <ContentBlockRenderer
-                blocks={beforeText}
-                steps={message.steps || []}
-                toolCalls={message.toolCalls || []}
-              />
-            ) : undefined,
-            afterMainContent: hasContentBlocks ? (
-              afterText.length > 0 ? (
-                <ContentBlockRenderer
-                  blocks={afterText}
-                  steps={message.steps || []}
-                  toolCalls={message.toolCalls || []}
-                />
-              ) : undefined
-            ) : (
-              // Fallback for messages without contentBlocks (e.g., from old format)
-              <>
-                {message.steps && message.steps.length > 0 && (
-                  <StepsList steps={message.steps} />
-                )}
-                {message.toolCalls && message.toolCalls.length > 0 && (
-                  <ToolCallsList toolCalls={message.toolCalls} />
-                )}
-              </>
-            ),
-          }}
-        />
+              afterMainContent: (
+                <>
+                  {message.steps && message.steps.length > 0 && (
+                    <StepsList steps={message.steps} />
+                  )}
+                  {message.toolCalls && message.toolCalls.length > 0 && (
+                    <ToolCallsList toolCalls={message.toolCalls} />
+                  )}
+                </>
+              ),
+            }}
+          />
         )
       })}
 

@@ -45,6 +45,9 @@ function App() {
     // Simulate assistant response with streaming
     const assistantId = `assistant-${Date.now()}`
     const contentBlocks: ContentBlock[] = []
+    const toolCalls: ToolCall[] = []
+    const steps: Step[] = []
+    let fullContent = ''
     const assistantMessage: ChatMessage = {
       id: assistantId,
       role: 'assistant',
@@ -64,94 +67,103 @@ function App() {
       })
     }
 
-    // Simulate steps with pending -> in-progress -> done transitions
-    // Steps arrive FIRST, so add steps block at the beginning
-    contentBlocks.push({ type: 'steps', id: 'steps' })
-    const steps: Step[] = [
-      { id: 'step-1', name: 'Analyzing query', status: 'pending' },
-      { id: 'step-2', name: 'Gathering context', status: 'pending' },
-      { id: 'step-3', name: 'Generating response', status: 'pending' },
-    ]
+    // Helper to stream text
+    const streamText = async (text: string) => {
+      const textBlockId = `text-${Date.now()}`
+      contentBlocks.push({ type: 'text', id: textBlockId, content: '' })
+      for (const char of text) {
+        fullContent += char
+        const textBlock = contentBlocks.find((b): b is ContentBlock & { type: 'text' } => b.type === 'text' && b.id === textBlockId)
+        if (textBlock) {
+          textBlock.content += char
+        }
+        updateMessage({ content: fullContent, contentBlocks: [...contentBlocks] })
+        await delay(15)
+      }
+    }
 
-    for (let i = 0; i < steps.length; i++) {
-      // Mark current step as in-progress
-      steps[i].status = 'in-progress'
-      updateMessage({ steps: [...steps], contentBlocks: [...contentBlocks] })
-      await delay(800)
-      // Mark current step as done
-      steps[i].status = 'done'
-      updateMessage({ steps: [...steps], contentBlocks: [...contentBlocks] })
+    // Helper to simulate steps
+    const simulateSteps = async (stepNames: string[]) => {
+      contentBlocks.push({ type: 'steps', id: 'steps' })
+      for (const name of stepNames) {
+        steps.push({ id: `step-${steps.length + 1}`, name, status: 'pending' })
+      }
+      for (let i = 0; i < steps.length; i++) {
+        steps[i].status = 'in-progress'
+        updateMessage({ steps: [...steps], contentBlocks: [...contentBlocks] })
+        await delay(600)
+        steps[i].status = 'done'
+        updateMessage({ steps: [...steps], contentBlocks: [...contentBlocks] })
+        await delay(150)
+      }
+    }
+
+    // Helper to simulate a tool call
+    const simulateToolCall = async (name: string, args: object, result: object) => {
+      if (!contentBlocks.some(b => b.type === 'tools')) {
+        contentBlocks.push({ type: 'tools', id: 'tools' })
+      }
+      const toolCall: ToolCall = {
+        id: `tool-${toolCalls.length + 1}`,
+        name,
+        args: '',
+        isLoading: true,
+      }
+      toolCalls.push(toolCall)
+      updateMessage({ toolCalls: [...toolCalls], contentBlocks: [...contentBlocks] })
+      await delay(300)
+
+      // Stream args
+      const argsText = JSON.stringify(args)
+      for (const char of argsText) {
+        toolCall.args += char
+        updateMessage({ toolCalls: [...toolCalls], contentBlocks: [...contentBlocks] })
+        await delay(15)
+      }
+      await delay(400)
+
+      // Set result
+      toolCall.isLoading = false
+      toolCall.result = JSON.stringify(result, null, 2)
+      updateMessage({ toolCalls: [...toolCalls], contentBlocks: [...contentBlocks] })
       await delay(200)
     }
 
-    // Simulate tool call - add tools block after steps
-    contentBlocks.push({ type: 'tools', id: 'tools' })
-    const toolCall: ToolCall = {
-      id: 'tool-1',
-      name: 'get_cluster_metrics',
-      args: '',
-      isLoading: true,
-    }
-    updateMessage({ toolCalls: [toolCall], contentBlocks: [...contentBlocks] })
-    await delay(400)
+    // Parse input as space-separated commands: step, tool, text
+    const commands = userContent.toLowerCase().trim().split(/\s+/)
+    const validCommands = ['step', 'tool', 'text']
+    const hasValidCommands = commands.some(cmd => validCommands.includes(cmd))
 
-    // Stream tool arguments
-    const argsText = '{"cluster": "prod-east", "metric": "cpu_usage"}'
-    for (const char of argsText) {
-      toolCall.args += char
-      updateMessage({ toolCalls: [{ ...toolCall }], contentBlocks: [...contentBlocks] })
-      await delay(20)
-    }
-    await delay(500)
+    if (hasValidCommands) {
+      let toolIndex = 0
+      let textIndex = 0
+      const toolVariants = [
+        { name: 'get_cluster_metrics', args: { cluster: 'prod-east' }, result: { cpu: '45%', memory: '62%' } },
+        { name: 'get_pod_status', args: { namespace: 'default' }, result: { running: 12, pending: 0 } },
+        { name: 'get_alerts', args: { severity: 'critical' }, result: { count: 0, alerts: [] } },
+      ]
+      const textVariants = [
+        'Here is some information based on the analysis.',
+        'The cluster is operating normally with healthy resource usage.',
+        'All systems are functioning as expected.',
+      ]
 
-    // Tool result
-    toolCall.isLoading = false
-    toolCall.result = JSON.stringify({
-      cpu_usage: '45%',
-      memory_usage: '62%',
-      pod_count: 128,
-      node_status: 'healthy',
-    }, null, 2)
-    updateMessage({ toolCalls: [{ ...toolCall }], contentBlocks: [...contentBlocks] })
-    await delay(300)
-
-    // Stream the response text - add text block AFTER steps and tools
-    const textBlockId = `text-${Date.now()}`
-    contentBlocks.push({ type: 'text', id: textBlockId, content: '' })
-    const responseText = `## Cluster Status
-
-Based on the metrics from **prod-east** cluster:
-
-| Metric | Value |
-|--------|-------|
-| CPU Usage | 45% |
-| Memory Usage | 62% |
-| Pod Count | 128 |
-| Node Status | Healthy |
-
-### Summary
-
-The cluster is operating normally. CPU and memory usage are within acceptable limits.
-
-\`\`\`yaml
-cluster:
-  name: prod-east
-  status: healthy
-  alerts: 0
-\`\`\`
-
-Would you like me to check any specific pods or services?`
-
-    let currentContent = ''
-    for (const char of responseText) {
-      currentContent += char
-      // Update the text block content
-      const textBlock = contentBlocks.find((b): b is ContentBlock & { type: 'text' } => b.type === 'text' && b.id === textBlockId)
-      if (textBlock) {
-        textBlock.content = currentContent
+      for (const cmd of commands) {
+        if (cmd === 'step') {
+          await simulateSteps(['Analyzing query', 'Gathering context', 'Generating response'])
+        } else if (cmd === 'tool') {
+          const variant = toolVariants[toolIndex % toolVariants.length]
+          await simulateToolCall(variant.name, variant.args, variant.result)
+          toolIndex++
+        } else if (cmd === 'text') {
+          const text = textVariants[textIndex % textVariants.length]
+          await streamText(text + '\n\n')
+          textIndex++
+        }
       }
-      updateMessage({ content: currentContent, contentBlocks: [...contentBlocks] })
-      await delay(15)
+    } else {
+      // Default: show help
+      await streamText(`You said: "${userContent}"\n\nThis is a demo. Type a space-separated sequence of:\n- **step** - show steps\n- **tool** - show tool call\n- **text** - show text\n\nExample: \`step text tool text\``)
     }
 
     // End streaming
