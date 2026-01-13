@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { ChatWindow } from './components/ChatWindow'
 import { useAgUiStream } from './hooks/useAgUiStream'
-import type { ChatMessage, ToolCall, Step } from './types/agui'
+import type { ChatMessage, ToolCall, Step, ContentBlock } from './types/agui'
 
 const MODE_STORAGE_KEY = 'app-mode'
 
@@ -44,6 +44,7 @@ function App() {
 
     // Simulate assistant response with streaming
     const assistantId = `assistant-${Date.now()}`
+    const contentBlocks: ContentBlock[] = []
     const assistantMessage: ChatMessage = {
       id: assistantId,
       role: 'assistant',
@@ -51,6 +52,7 @@ function App() {
       isStreaming: true,
       toolCalls: [],
       steps: [],
+      contentBlocks: [],
     }
     setDemoMessages((prev) => [...prev, assistantMessage])
 
@@ -62,36 +64,42 @@ function App() {
       })
     }
 
-    // Simulate steps
+    // Simulate steps with pending -> in-progress -> done transitions
+    // Steps arrive FIRST, so add steps block at the beginning
+    contentBlocks.push({ type: 'steps', id: 'steps' })
     const steps: Step[] = [
-      { id: 'step-1', name: 'Analyzing query', isComplete: false },
-      { id: 'step-2', name: 'Gathering context', isComplete: false },
-      { id: 'step-3', name: 'Generating response', isComplete: false },
+      { id: 'step-1', name: 'Analyzing query', status: 'pending' },
+      { id: 'step-2', name: 'Gathering context', status: 'pending' },
+      { id: 'step-3', name: 'Generating response', status: 'pending' },
     ]
 
-    for (const step of steps) {
-      updateMessage({ steps: [...steps.filter(s => s.id <= step.id)] })
-      await delay(500)
-      step.isComplete = true
-      updateMessage({ steps: [...steps] })
-      await delay(300)
+    for (let i = 0; i < steps.length; i++) {
+      // Mark current step as in-progress
+      steps[i].status = 'in-progress'
+      updateMessage({ steps: [...steps], contentBlocks: [...contentBlocks] })
+      await delay(800)
+      // Mark current step as done
+      steps[i].status = 'done'
+      updateMessage({ steps: [...steps], contentBlocks: [...contentBlocks] })
+      await delay(200)
     }
 
-    // Simulate tool call
+    // Simulate tool call - add tools block after steps
+    contentBlocks.push({ type: 'tools', id: 'tools' })
     const toolCall: ToolCall = {
       id: 'tool-1',
       name: 'get_cluster_metrics',
       args: '',
       isLoading: true,
     }
-    updateMessage({ toolCalls: [toolCall] })
+    updateMessage({ toolCalls: [toolCall], contentBlocks: [...contentBlocks] })
     await delay(400)
 
     // Stream tool arguments
     const argsText = '{"cluster": "prod-east", "metric": "cpu_usage"}'
     for (const char of argsText) {
       toolCall.args += char
-      updateMessage({ toolCalls: [{ ...toolCall }] })
+      updateMessage({ toolCalls: [{ ...toolCall }], contentBlocks: [...contentBlocks] })
       await delay(20)
     }
     await delay(500)
@@ -104,10 +112,12 @@ function App() {
       pod_count: 128,
       node_status: 'healthy',
     }, null, 2)
-    updateMessage({ toolCalls: [{ ...toolCall }] })
+    updateMessage({ toolCalls: [{ ...toolCall }], contentBlocks: [...contentBlocks] })
     await delay(300)
 
-    // Stream the response text
+    // Stream the response text - add text block AFTER steps and tools
+    const textBlockId = `text-${Date.now()}`
+    contentBlocks.push({ type: 'text', id: textBlockId, content: '' })
     const responseText = `## Cluster Status
 
 Based on the metrics from **prod-east** cluster:
@@ -135,7 +145,12 @@ Would you like me to check any specific pods or services?`
     let currentContent = ''
     for (const char of responseText) {
       currentContent += char
-      updateMessage({ content: currentContent })
+      // Update the text block content
+      const textBlock = contentBlocks.find((b): b is ContentBlock & { type: 'text' } => b.type === 'text' && b.id === textBlockId)
+      if (textBlock) {
+        textBlock.content = currentContent
+      }
+      updateMessage({ content: currentContent, contentBlocks: [...contentBlocks] })
       await delay(15)
     }
 

@@ -112,6 +112,12 @@ export type AgUiEvent =
   | StepStartedEvent
   | StepFinishedEvent
 
+// Content block types for ordered rendering
+export type ContentBlock =
+  | { type: 'text'; id: string; content: string }
+  | { type: 'steps'; id: string } // Steps are stored separately and referenced here
+  | { type: 'tools'; id: string } // Tool calls are stored separately and referenced here
+
 // Chat message types for UI state
 export interface ChatMessage {
   id: string
@@ -120,6 +126,7 @@ export interface ChatMessage {
   isStreaming?: boolean
   toolCalls?: ToolCall[]
   steps?: Step[]
+  contentBlocks?: ContentBlock[] // Ordered list of content blocks for rendering
 }
 
 export interface ToolCall {
@@ -133,5 +140,5 @@ export interface ToolCall {
 export interface Step {
   id: string
   name: string
-  isComplete: boolean
+  status: 'pending' | 'in-progress' | 'done'
 }

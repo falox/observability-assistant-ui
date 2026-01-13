@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import type { AgUiEvent, ChatMessage, ToolCall, Step } from '../types/agui'
+import type { AgUiEvent, ChatMessage, ToolCall, Step, ContentBlock } from '../types/agui'
 
 interface UseAgUiStreamOptions {
   endpoint?: string
@@ -28,6 +28,10 @@ export function useAgUiStream(
   const currentMessageRef = useRef<ChatMessage | null>(null)
   const toolCallsRef = useRef<Map<string, ToolCall>>(new Map())
   const stepsRef = useRef<Map<string, Step>>(new Map())
+  const contentBlocksRef = useRef<ContentBlock[]>([])
+  const currentTextBlockIdRef = useRef<string | null>(null)
+  const hasStepsBlockRef = useRef(false)
+  const hasToolsBlockRef = useRef(false)
 
   // Ensures an assistant message exists, creating one if needed
   const ensureAssistantMessage = useCallback(() => {
@@ -39,10 +43,15 @@ export function useAgUiStream(
         isStreaming: true,
         toolCalls: [],
         steps: [],
+        contentBlocks: [],
       }
       currentMessageRef.current = newMessage
       toolCallsRef.current.clear()
       stepsRef.current.clear()
+      contentBlocksRef.current = []
+      currentTextBlockIdRef.current = null
+      hasStepsBlockRef.current = false
+      hasToolsBlockRef.current = false
       setMessages((prev) => [...prev, newMessage])
     }
   }, [])
@@ -84,13 +93,31 @@ export function useAgUiStream(
           // Always create a new message for each TEXT_MESSAGE_START
           // This ensures each text block gets its own "balloon"
           ensureAssistantMessage()
+          // Create a new text block
+          const textBlockId = `text-${Date.now()}`
+          currentTextBlockIdRef.current = textBlockId
+          contentBlocksRef.current.push({ type: 'text', id: textBlockId, content: '' })
+          updateCurrentMessage({
+            contentBlocks: [...contentBlocksRef.current],
+          })
           break
         }
 
         case 'TEXT_MESSAGE_CONTENT': {
           ensureAssistantMessage()
+          // Update the current text block content
+          const textBlockId = currentTextBlockIdRef.current
+          if (textBlockId) {
+            const textBlock = contentBlocksRef.current.find(
+              (b): b is ContentBlock & { type: 'text' } => b.type === 'text' && b.id === textBlockId
+            )
+            if (textBlock) {
+              textBlock.content += event.delta
+            }
+          }
           updateCurrentMessage({
             content: (currentMessageRef.current?.content || '') + event.delta,
+            contentBlocks: [...contentBlocksRef.current],
           })
           break
         }
@@ -98,17 +125,26 @@ export function useAgUiStream(
         case 'TEXT_MESSAGE_END': {
           // Finalize current message and allow a new one to be created
           // This ensures each text message block gets its own "balloon"
+          currentTextBlockIdRef.current = null
           if (currentMessageRef.current) {
             updateCurrentMessage({ isStreaming: false })
             currentMessageRef.current = null
             toolCallsRef.current.clear()
             stepsRef.current.clear()
+            contentBlocksRef.current = []
+            hasStepsBlockRef.current = false
+            hasToolsBlockRef.current = false
           }
           break
         }
 
         case 'TOOL_CALL_START': {
           ensureAssistantMessage()
+          // Add tools block if this is the first tool call
+          if (!hasToolsBlockRef.current) {
+            hasToolsBlockRef.current = true
+            contentBlocksRef.current.push({ type: 'tools', id: 'tools' })
+          }
           const toolCall: ToolCall = {
             id: event.toolCallId,
             name: event.toolCallName,
@@ -118,6 +154,7 @@ export function useAgUiStream(
           toolCallsRef.current.set(event.toolCallId, toolCall)
           updateCurrentMessage({
             toolCalls: Array.from(toolCallsRef.current.values()),
+            contentBlocks: [...contentBlocksRef.current],
           })
           break
         }
@@ -158,14 +195,27 @@ export function useAgUiStream(
 
         case 'STEP_STARTED': {
           ensureAssistantMessage()
-          const step: Step = {
-            id: event.stepId || event.stepName,
-            name: event.stepName,
-            isComplete: false,
+          // Add steps block if this is the first step
+          if (!hasStepsBlockRef.current) {
+            hasStepsBlockRef.current = true
+            contentBlocksRef.current.push({ type: 'steps', id: 'steps' })
           }
-          stepsRef.current.set(step.id, step)
+          const stepId = event.stepId || event.stepName
+          // Mark any currently in-progress steps as pending (only one active at a time)
+          for (const step of stepsRef.current.values()) {
+            if (step.status === 'in-progress') {
+              step.status = 'pending'
+            }
+          }
+          const step: Step = {
+            id: stepId,
+            name: event.stepName,
+            status: 'in-progress',
+          }
+          stepsRef.current.set(stepId, step)
           updateCurrentMessage({
             steps: Array.from(stepsRef.current.values()),
+            contentBlocks: [...contentBlocksRef.current],
           })
           break
         }
@@ -174,7 +224,7 @@ export function useAgUiStream(
           const stepId = event.stepId || event.stepName
           const step = stepsRef.current.get(stepId)
           if (step) {
-            step.isComplete = true
+            step.status = 'done'
             updateCurrentMessage({
               steps: Array.from(stepsRef.current.values()),
             })
@@ -195,6 +245,10 @@ export function useAgUiStream(
           currentMessageRef.current = null
           toolCallsRef.current.clear()
           stepsRef.current.clear()
+          contentBlocksRef.current = []
+          currentTextBlockIdRef.current = null
+          hasStepsBlockRef.current = false
+          hasToolsBlockRef.current = false
           setRunActive(false)
           setIsStreaming(false)
           break
