@@ -223,10 +223,10 @@ interface MessageListProps {
 export function MessageList({ messages, isStreaming, runActive }: MessageListProps) {
   const scrollToBottomRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when messages change or loading indicator appears
   useEffect(() => {
     scrollToBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isStreaming])
+  }, [messages, isStreaming, runActive])
 
   return (
     <MessageBox>
@@ -293,8 +293,8 @@ export function MessageList({ messages, isStreaming, runActive }: MessageListPro
         )
       })}
 
-      {/* Show loading indicator when run is active and no current message is streaming */}
-      {runActive && !messages.some(m => m.isStreaming) && (
+      {/* Show loading indicator when run is active */}
+      {runActive && (
         <Message
           role="bot"
           name="Assistant"
