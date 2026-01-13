@@ -8,22 +8,80 @@ import {
   ExpandableSection,
   CodeBlock,
   CodeBlockCode,
+  CodeBlockAction,
+  Button,
+  Tooltip,
   Spinner,
   ProgressStepper,
   ProgressStep,
   Content,
+  getUniqueId,
 } from '@patternfly/react-core'
 import {
   CheckCircleIcon,
   OutlinedCircleIcon,
   WrenchIcon,
+  CopyIcon,
+  CheckIcon,
 } from '@patternfly/react-icons'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { Components } from 'react-markdown'
 import type { ChatMessage, Step, ToolCall, ContentBlock } from '../types/agui'
 
 // Standard PatternFly chatbot avatars
 import userAvatar from '../assets/user_avatar.svg'
 import patternflyAvatar from '../assets/patternfly_avatar.jpg'
+
+// Code block component with copy button for markdown rendering
+function CodeBlockWithCopy({ children, className }: { children: React.ReactNode; className?: string }) {
+  const [copied, setCopied] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const tooltipId = getUniqueId()
+
+  const language = /language-(\w+)/.exec(className || '')?.[1]
+  const codeString = String(children).replace(/\n$/, '')
+
+  // For inline code (no newlines), render as simple code element
+  if (!String(children).includes('\n')) {
+    return <code className="pf-chatbot__message-inline-code">{children}</code>
+  }
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(codeString)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 3000)
+  }
+
+  const actions = (
+    <CodeBlockAction>
+      {language && <div className="pf-chatbot__message-code-block-language">{language}</div>}
+      <Button
+        ref={buttonRef}
+        aria-label="Copy code"
+        variant="plain"
+        className="pf-chatbot__button--copy"
+        onClick={handleCopy}
+      >
+        {copied ? <CheckIcon /> : <CopyIcon />}
+      </Button>
+      <Tooltip id={tooltipId} content="Copy" position="top" triggerRef={buttonRef} />
+    </CodeBlockAction>
+  )
+
+  return (
+    <div className="pf-chatbot__message-code-block">
+      <CodeBlock actions={actions}>
+        <CodeBlockCode>{codeString}</CodeBlockCode>
+      </CodeBlock>
+    </div>
+  )
+}
+
+// Custom components for ReactMarkdown to use PatternFly styling
+const markdownComponents: Components = {
+  code: ({ children, className }) => (
+    <CodeBlockWithCopy className={className}>{children}</CodeBlockWithCopy>
+  ),
+}
 
 // Separate component for steps to manage expanded state
 function StepsList({ steps }: { steps: Step[] }) {
@@ -130,7 +188,7 @@ function ContentBlockRenderer({
           case 'text':
             return block.content ? (
               <Content key={block.id}>
-                <ReactMarkdown>{block.content}</ReactMarkdown>
+                <ReactMarkdown components={markdownComponents}>{block.content}</ReactMarkdown>
               </Content>
             ) : null
           case 'steps':
