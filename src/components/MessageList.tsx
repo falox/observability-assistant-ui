@@ -119,10 +119,16 @@ function StepsList({ steps }: { steps: Step[] }) {
   )
 }
 
+// Style for code blocks inside tool responses to prevent overflow
+const toolCodeBlockStyle: React.CSSProperties = {
+  maxWidth: '100%',
+  overflow: 'auto',
+}
+
 // Component for tool calls
 function ToolCallsList({ toolCalls }: { toolCalls: ToolCall[] }) {
   return (
-    <div style={{ marginTop: '1rem' }}>
+    <div style={{ marginTop: '1rem', maxWidth: '100%', overflow: 'hidden' }}>
       {toolCalls.map((toolCall) => (
         <ToolResponse
           key={toolCall.id}
@@ -146,24 +152,28 @@ function ToolCallsList({ toolCalls }: { toolCalls: ToolCall[] }) {
             </span>
           }
           cardBody={
-            <>
+            <div style={{ maxWidth: '100%', overflow: 'hidden' }}>
               {toolCall.args && (
                 <div style={{ marginBottom: '0.5rem' }}>
                   <strong>Parameters</strong>
-                  <CodeBlock>
-                    <CodeBlockCode>{toolCall.args}</CodeBlockCode>
-                  </CodeBlock>
+                  <div style={toolCodeBlockStyle}>
+                    <CodeBlock>
+                      <CodeBlockCode>{toolCall.args}</CodeBlockCode>
+                    </CodeBlock>
+                  </div>
                 </div>
               )}
               {toolCall.result && (
                 <div>
                   <strong>Response</strong>
-                  <CodeBlock>
-                    <CodeBlockCode>{toolCall.result}</CodeBlockCode>
-                  </CodeBlock>
+                  <div style={toolCodeBlockStyle}>
+                    <CodeBlock>
+                      <CodeBlockCode>{toolCall.result}</CodeBlockCode>
+                    </CodeBlock>
+                  </div>
                 </div>
               )}
-            </>
+            </div>
           }
         />
       ))}

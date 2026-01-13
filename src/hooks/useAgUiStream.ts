@@ -123,18 +123,9 @@ export function useAgUiStream(
         }
 
         case 'TEXT_MESSAGE_END': {
-          // Finalize current message and allow a new one to be created
-          // This ensures each text message block gets its own "balloon"
+          // End the current text block, but keep the message and refs active
+          // so that subsequent tool results can still update the same message
           currentTextBlockIdRef.current = null
-          if (currentMessageRef.current) {
-            updateCurrentMessage({ isStreaming: false })
-            currentMessageRef.current = null
-            toolCallsRef.current.clear()
-            stepsRef.current.clear()
-            contentBlocksRef.current = []
-            hasStepsBlockRef.current = false
-            hasToolsBlockRef.current = false
-          }
           break
         }
 
