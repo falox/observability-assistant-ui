@@ -74,18 +74,12 @@ export function useAgUiStream(
     (event: AgUiEvent) => {
       switch (event.type) {
         case 'TEXT_MESSAGE_START': {
-          const newMessage: ChatMessage = {
-            id: event.messageId,
-            role: event.role === 'assistant' ? 'assistant' : 'user',
-            content: '',
-            isStreaming: true,
-            toolCalls: [],
-            steps: [],
+          // Reuse existing assistant message if one exists (for multi-part responses within a run)
+          if (currentMessageRef.current && event.role === 'assistant') {
+            // Already have an assistant message for this run, just continue using it
+            break
           }
-          currentMessageRef.current = newMessage
-          toolCallsRef.current.clear()
-          stepsRef.current.clear()
-          setMessages((prev) => [...prev, newMessage])
+          ensureAssistantMessage()
           break
         }
 
@@ -98,8 +92,8 @@ export function useAgUiStream(
         }
 
         case 'TEXT_MESSAGE_END': {
-          updateCurrentMessage({ isStreaming: false })
-          currentMessageRef.current = null
+          // Don't clear currentMessageRef here - keep it for the entire run
+          // The message will be finalized on RUN_FINISHED
           break
         }
 
@@ -107,7 +101,7 @@ export function useAgUiStream(
           ensureAssistantMessage()
           const toolCall: ToolCall = {
             id: event.toolCallId,
-            name: event.toolName,
+            name: event.toolCallName,
             args: '',
             isLoading: true,
           }
@@ -185,6 +179,11 @@ export function useAgUiStream(
         }
 
         case 'RUN_FINISHED': {
+          // Finalize the current message and reset for next run
+          updateCurrentMessage({ isStreaming: false })
+          currentMessageRef.current = null
+          toolCallsRef.current.clear()
+          stepsRef.current.clear()
           setIsStreaming(false)
           break
         }

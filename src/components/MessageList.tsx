@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import {
   Message,
   MessageBox,
+  ToolResponse,
 } from '@patternfly/chatbot'
 import {
   ExpandableSection,
@@ -9,10 +10,12 @@ import {
   LabelGroup,
   CodeBlock,
   CodeBlockCode,
+  Spinner,
 } from '@patternfly/react-core'
 import {
   CheckCircleIcon,
   InProgressIcon,
+  WrenchIcon,
 } from '@patternfly/react-icons'
 import type { ChatMessage } from '../types/agui'
 
@@ -83,32 +86,48 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
                 {message.toolCalls && message.toolCalls.length > 0 && (
                   <div style={{ marginTop: '1rem' }}>
                     {message.toolCalls.map((toolCall) => (
-                      <ExpandableSection
+                      <ToolResponse
                         key={toolCall.id}
-                        toggleText={
-                          toolCall.isLoading
-                            ? `Running: ${toolCall.name}...`
-                            : `Tool: ${toolCall.name}`
+                        toggleContent={
+                          <span>
+                            {toolCall.isLoading ? (
+                              <>
+                                <Spinner size="sm" /> Running: {toolCall.name}...
+                              </>
+                            ) : (
+                              <>
+                                <WrenchIcon /> Tool response: {toolCall.name}
+                              </>
+                            )}
+                          </span>
                         }
-                        isIndented
-                      >
-                        {toolCall.args && (
-                          <div style={{ marginBottom: '0.5rem' }}>
-                            <strong>Arguments:</strong>
-                            <CodeBlock>
-                              <CodeBlockCode>{toolCall.args}</CodeBlockCode>
-                            </CodeBlock>
-                          </div>
-                        )}
-                        {toolCall.result && (
-                          <div>
-                            <strong>Result:</strong>
-                            <CodeBlock>
-                              <CodeBlockCode>{toolCall.result}</CodeBlockCode>
-                            </CodeBlock>
-                          </div>
-                        )}
-                      </ExpandableSection>
+                        body={toolCall.result ? 'Tool execution completed.' : undefined}
+                        cardTitle={
+                          <span>
+                            <WrenchIcon /> {toolCall.name}
+                          </span>
+                        }
+                        cardBody={
+                          <>
+                            {toolCall.args && (
+                              <div style={{ marginBottom: '0.5rem' }}>
+                                <strong>Parameters</strong>
+                                <CodeBlock>
+                                  <CodeBlockCode>{toolCall.args}</CodeBlockCode>
+                                </CodeBlock>
+                              </div>
+                            )}
+                            {toolCall.result && (
+                              <div>
+                                <strong>Response</strong>
+                                <CodeBlock>
+                                  <CodeBlockCode>{toolCall.result}</CodeBlockCode>
+                                </CodeBlock>
+                              </div>
+                            )}
+                          </>
+                        }
+                      />
                     ))}
                   </div>
                 )}

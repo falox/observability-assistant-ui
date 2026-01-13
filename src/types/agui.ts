@@ -63,7 +63,7 @@ export interface TextMessageEndEvent extends BaseEvent {
 export interface ToolCallStartEvent extends BaseEvent {
   type: 'TOOL_CALL_START'
   toolCallId: string
-  toolName: string
+  toolCallName: string
   parentMessageId?: string
 }
 
