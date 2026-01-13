@@ -167,7 +167,20 @@ export function ChatWindow({
           placeholder="Ask about your cluster..."
         />
         <ChatbotFootnote
-          label="This is an AI assistant. Responses may not always be accurate."
+          label="Observability Assistant uses AI. Check for mistakes."
+          popover={{
+            title: 'Verify information',
+            description:
+              'While this assistant strives for accuracy, AI is experimental and can make mistakes. We cannot guarantee that all information provided is up to date or without error. You should always verify responses using reliable sources, especially for crucial information and decision making.',
+            cta: {
+              label: 'Dismiss',
+              onClick: () => {},
+            },
+            link: {
+              label: 'Learn more about AI',
+              url: 'https://www.redhat.com/en/topics/ai',
+            },
+          }}
         />
       </ChatbotFooter>
     </Chatbot>
