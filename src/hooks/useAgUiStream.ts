@@ -8,6 +8,7 @@ interface UseAgUiStreamOptions {
 interface UseAgUiStreamReturn {
   messages: ChatMessage[]
   isStreaming: boolean
+  runActive: boolean
   error: string | null
   sendMessage: (content: string) => Promise<void>
   clearMessages: () => void
@@ -20,6 +21,7 @@ export function useAgUiStream(
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  const [runActive, setRunActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -73,12 +75,14 @@ export function useAgUiStream(
   const handleEvent = useCallback(
     (event: AgUiEvent) => {
       switch (event.type) {
+        case 'RUN_STARTED': {
+          setRunActive(true)
+          break
+        }
+
         case 'TEXT_MESSAGE_START': {
-          // Reuse existing assistant message if one exists (for multi-part responses within a run)
-          if (currentMessageRef.current && event.role === 'assistant') {
-            // Already have an assistant message for this run, just continue using it
-            break
-          }
+          // Always create a new message for each TEXT_MESSAGE_START
+          // This ensures each text block gets its own "balloon"
           ensureAssistantMessage()
           break
         }
@@ -92,8 +96,14 @@ export function useAgUiStream(
         }
 
         case 'TEXT_MESSAGE_END': {
-          // Don't clear currentMessageRef here - keep it for the entire run
-          // The message will be finalized on RUN_FINISHED
+          // Finalize current message and allow a new one to be created
+          // This ensures each text message block gets its own "balloon"
+          if (currentMessageRef.current) {
+            updateCurrentMessage({ isStreaming: false })
+            currentMessageRef.current = null
+            toolCallsRef.current.clear()
+            stepsRef.current.clear()
+          }
           break
         }
 
@@ -174,6 +184,7 @@ export function useAgUiStream(
 
         case 'RUN_ERROR': {
           setError(event.message)
+          setRunActive(false)
           setIsStreaming(false)
           break
         }
@@ -184,6 +195,7 @@ export function useAgUiStream(
           currentMessageRef.current = null
           toolCallsRef.current.clear()
           stepsRef.current.clear()
+          setRunActive(false)
           setIsStreaming(false)
           break
         }
@@ -292,6 +304,7 @@ export function useAgUiStream(
   return {
     messages,
     isStreaming,
+    runActive,
     error,
     sendMessage,
     clearMessages,

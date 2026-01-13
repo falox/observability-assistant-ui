@@ -29,6 +29,7 @@ function App() {
   // Demo state for testing without backend
   const [demoMessages, setDemoMessages] = useState<ChatMessage[]>([])
   const [demoStreaming, setDemoStreaming] = useState(false)
+  const [demoRunActive, setDemoRunActive] = useState(false)
 
   const simulateAgUiStream = useCallback(async (userContent: string) => {
     // Add user message
@@ -39,6 +40,7 @@ function App() {
     }
     setDemoMessages((prev) => [...prev, userMessage])
     setDemoStreaming(true)
+    setDemoRunActive(true)
 
     // Simulate assistant response with streaming
     const assistantId = `assistant-${Date.now()}`
@@ -139,6 +141,7 @@ Would you like me to check any specific pods or services?`
 
     // End streaming
     updateMessage({ isStreaming: false })
+    setDemoRunActive(false)
     setDemoStreaming(false)
   }, [])
 
@@ -152,12 +155,14 @@ Would you like me to check any specific pods or services?`
 
   const messages = isDemoMode ? demoMessages : agUi.messages
   const isStreaming = isDemoMode ? demoStreaming : agUi.isStreaming
+  const runActive = isDemoMode ? demoRunActive : agUi.runActive
   const error = isDemoMode ? null : agUi.error
 
   return (
     <ChatWindow
       messages={messages}
       isStreaming={isStreaming}
+      runActive={runActive}
       error={error}
       onSendMessage={handleSendMessage}
       onClearMessages={handleClearMessages}

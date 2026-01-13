@@ -26,9 +26,10 @@ import patternflyAvatar from '../assets/patternfly_avatar.jpg'
 interface MessageListProps {
   messages: ChatMessage[]
   isStreaming: boolean
+  runActive: boolean
 }
 
-export function MessageList({ messages, isStreaming }: MessageListProps) {
+export function MessageList({ messages, isStreaming, runActive }: MessageListProps) {
   const scrollToBottomRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when messages change
@@ -138,26 +139,15 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
         )
       })}
 
-      {/* Show loading indicator when streaming and no visible assistant content yet */}
-      {isStreaming && (() => {
-        const lastMessage = messages[messages.length - 1]
-        // Show loading if last message is user, or if last message is empty streaming assistant
-        const showLoading =
-          lastMessage?.role === 'user' ||
-          (lastMessage?.role === 'assistant' &&
-            lastMessage.isStreaming &&
-            !lastMessage.content &&
-            (!lastMessage.toolCalls || lastMessage.toolCalls.length === 0) &&
-            (!lastMessage.steps || lastMessage.steps.length === 0))
-        return showLoading ? (
-          <Message
-            role="bot"
-            name="Assistant"
-            avatar={patternflyAvatar}
-            isLoading
-          />
-        ) : null
-      })()}
+      {/* Show loading indicator when run is active and no current message is streaming */}
+      {runActive && !messages.some(m => m.isStreaming) && (
+        <Message
+          role="bot"
+          name="Assistant"
+          avatar={patternflyAvatar}
+          isLoading
+        />
+      )}
       {/* Auto-scroll anchor */}
       <div ref={scrollToBottomRef} />
     </MessageBox>

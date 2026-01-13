@@ -20,6 +20,7 @@ import type { ChatMessage } from '../types/agui'
 interface ChatWindowProps {
   messages: ChatMessage[]
   isStreaming: boolean
+  runActive: boolean
   error: string | null
   onSendMessage: (content: string) => void
   onClearMessages: () => void
@@ -42,6 +43,7 @@ function getStoredTheme(): Theme {
 export function ChatWindow({
   messages,
   isStreaming,
+  runActive,
   error,
   onSendMessage,
   onClearMessages,
@@ -176,7 +178,7 @@ export function ChatWindow({
       </ChatbotHeader>
 
       <ChatbotContent>
-        <MessageList messages={messages} isStreaming={isStreaming} />
+        <MessageList messages={messages} isStreaming={isStreaming} runActive={runActive} />
       </ChatbotContent>
 
       <ChatbotFooter>
