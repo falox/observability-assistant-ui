@@ -5,7 +5,6 @@ import {
   ToolResponse,
 } from '@patternfly/chatbot'
 import {
-  ExpandableSection,
   CodeBlock,
   CodeBlockCode,
   CodeBlockAction,
@@ -102,39 +101,24 @@ const markdownComponents: Components = {
   li: ({ children }) => <ListItem>{children}</ListItem>,
 }
 
-// Separate component for steps to manage expanded state
+// Component for steps display
 function StepsList({ steps }: { steps: Step[] }) {
-  const [isExpanded, setIsExpanded] = useState(true)
-
   return (
-    <ExpandableSection
-      toggleText={`${steps.filter(s => s.status === 'done').length}/${steps.length} steps completed`}
-      isIndented
-      isExpanded={isExpanded}
-      onToggle={(_event, expanded) => setIsExpanded(expanded)}
-    >
-      <ProgressStepper isVertical>
-        {steps.map((step) => {
-          const variant = step.status === 'done' ? 'success'
-            : step.status === 'in-progress' ? 'info'
-            : 'pending'
-          const icon = step.status === 'done' ? <CheckCircleIcon />
-            : step.status === 'in-progress' ? <Spinner size="md" />
-            : <OutlinedCircleIcon />
-          return (
-            <ProgressStep
-              key={step.id}
-              variant={variant}
-              icon={icon}
-              isCurrent={step.status === 'in-progress'}
-              aria-label={`${step.name}: ${step.status}`}
-            >
-              {step.name}
-            </ProgressStep>
-          )
-        })}
-      </ProgressStepper>
-    </ExpandableSection>
+    <ProgressStepper isVertical>
+      {steps.map((step) => {
+        const isDone = step.status === 'done'
+        return (
+          <ProgressStep
+            key={step.id}
+            variant={isDone ? 'success' : 'pending'}
+            icon={isDone ? <CheckCircleIcon /> : <OutlinedCircleIcon />}
+            aria-label={`${step.name}: ${step.status}`}
+          >
+            {step.name}
+          </ProgressStep>
+        )
+      })}
+    </ProgressStepper>
   )
 }
 

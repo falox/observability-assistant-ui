@@ -278,7 +278,7 @@ export function useAgUiStream(
           context: [],
           forwardedProps: {},
         }
-        console.log('[AG-UI] OUT:', requestBody)
+        console.log('[AG-UI] OUT:', JSON.stringify(requestBody))
 
         const response = await fetch(endpoint, {
           method: 'POST',
@@ -319,7 +319,7 @@ export function useAgUiStream(
 
               try {
                 const event = JSON.parse(data) as AgUiEvent
-                console.log('[AG-UI] IN:', event)
+                console.log('[AG-UI] IN:', JSON.stringify(event))
                 handleEvent(event)
               } catch {
                 console.warn('[AG-UI] Failed to parse event:', data)
