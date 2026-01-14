@@ -129,9 +129,9 @@ function App() {
       await delay(200)
     }
 
-    // Parse input as space-separated commands: step, tool, text, code
+    // Parse input as space-separated commands: step, tool, text, code, error
     const commands = userContent.toLowerCase().trim().split(/\s+/)
-    const validCommands = ['step', 'tool', 'text', 'code']
+    const validCommands = ['step', 'tool', 'text', 'code', 'error']
     const hasValidCommands = commands.some(cmd => validCommands.includes(cmd))
 
     if (hasValidCommands) {
@@ -169,11 +169,23 @@ function App() {
           const codeText = codeVariants[codeIndex % codeVariants.length]
           await streamText(codeText)
           codeIndex++
+        } else if (cmd === 'error') {
+          // Simulate an error message
+          updateMessage({
+            isStreaming: false,
+            error: {
+              title: 'Error',
+              body: 'Something went wrong while processing your request. Please try again later.',
+            },
+          })
+          setDemoRunActive(false)
+          setDemoStreaming(false)
+          return // Stop processing further commands
         }
       }
     } else {
       // Default: show help
-      await streamText(`You said: "${userContent}"\n\nThis is a demo. Type a space-separated sequence of:\n- **step** - show steps\n- **tool** - show tool call\n- **text** - show text\n- **code** - show text with code block\n\nExample: \`step text code tool\``)
+      await streamText(`You said: "${userContent}"\n\nThis is a demo. Type a space-separated sequence of:\n- **step** - show steps\n- **tool** - show tool call\n- **text** - show text\n- **code** - show text with code block\n- **error** - show error message\n\nExample: \`step text code tool\``)
     }
 
     // End streaming
@@ -193,14 +205,12 @@ function App() {
   const messages = isDemoMode ? demoMessages : agUi.messages
   const isStreaming = isDemoMode ? demoStreaming : agUi.isStreaming
   const runActive = isDemoMode ? demoRunActive : agUi.runActive
-  const error = isDemoMode ? null : agUi.error
 
   return (
     <ChatWindow
       messages={messages}
       isStreaming={isStreaming}
       runActive={runActive}
-      error={error}
       onSendMessage={handleSendMessage}
       onClearMessages={handleClearMessages}
       isDemoMode={isDemoMode}

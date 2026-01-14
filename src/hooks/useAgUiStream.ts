@@ -224,6 +224,23 @@ export function useAgUiStream(
         }
 
         case 'RUN_ERROR': {
+          // Create an error message for display
+          ensureAssistantMessage()
+          updateCurrentMessage({
+            isStreaming: false,
+            error: {
+              title: 'Error',
+              body: event.message,
+            },
+          })
+          // Reset refs for next run
+          currentMessageRef.current = null
+          toolCallsRef.current.clear()
+          stepsRef.current.clear()
+          contentBlocksRef.current = []
+          currentTextBlockIdRef.current = null
+          hasStepsBlockRef.current = false
+          hasToolsBlockRef.current = false
           setError(event.message)
           setRunActive(false)
           setIsStreaming(false)
@@ -329,13 +346,31 @@ export function useAgUiStream(
         }
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
+          // Create an error message for display
+          ensureAssistantMessage()
+          updateCurrentMessage({
+            isStreaming: false,
+            error: {
+              title: 'Request Failed',
+              body: err.message,
+            },
+          })
+          // Reset refs for next run
+          currentMessageRef.current = null
+          toolCallsRef.current.clear()
+          stepsRef.current.clear()
+          contentBlocksRef.current = []
+          currentTextBlockIdRef.current = null
+          hasStepsBlockRef.current = false
+          hasToolsBlockRef.current = false
           setError(err.message)
+          setRunActive(false)
         }
       } finally {
         setIsStreaming(false)
       }
     },
-    [endpoint, messages, handleEvent]
+    [endpoint, messages, handleEvent, ensureAssistantMessage, updateCurrentMessage]
   )
 
   const clearMessages = useCallback(() => {

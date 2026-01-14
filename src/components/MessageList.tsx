@@ -19,6 +19,8 @@ import {
   ListItem,
   ListComponent,
   getUniqueId,
+  Alert,
+  AlertVariant,
 } from '@patternfly/react-core'
 import {
   CheckCircleIcon,
@@ -249,6 +251,29 @@ export function MessageList({ messages, isStreaming, runActive }: MessageListPro
 
         if (isEmptyStreamingAssistant) {
           return null
+        }
+
+        // Render error messages with Alert
+        if (message.error) {
+          return (
+            <Message
+              key={message.id}
+              role="bot"
+              name="Assistant"
+              avatar={patternflyAvatar}
+              extraContent={{
+                beforeMainContent: (
+                  <Alert
+                    variant={AlertVariant.danger}
+                    title={message.error.title}
+                    isInline
+                  >
+                    {message.error.body}
+                  </Alert>
+                ),
+              }}
+            />
+          )
         }
 
         const hasContentBlocks = message.contentBlocks && message.contentBlocks.length > 0

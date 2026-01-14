@@ -21,7 +21,6 @@ interface ChatWindowProps {
   messages: ChatMessage[]
   isStreaming: boolean
   runActive: boolean
-  error: string | null
   onSendMessage: (content: string) => void
   onClearMessages: () => void
   isDemoMode: boolean
@@ -44,7 +43,6 @@ export function ChatWindow({
   messages,
   isStreaming,
   runActive,
-  error,
   onSendMessage,
   onClearMessages,
   isDemoMode,
@@ -182,11 +180,6 @@ export function ChatWindow({
       </ChatbotContent>
 
       <ChatbotFooter>
-        {error && (
-          <div style={{ color: 'var(--pf-t--global--color--status--danger--default)', padding: '0.5rem' }}>
-            Error: {error}
-          </div>
-        )}
         <MessageBar
           onSendMessage={handleSend}
           onChange={handleChange}

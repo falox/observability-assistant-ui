@@ -118,6 +118,12 @@ export type ContentBlock =
   | { type: 'steps'; id: string } // Steps are stored separately and referenced here
   | { type: 'tools'; id: string } // Tool calls are stored separately and referenced here
 
+// Error info for displaying error messages
+export interface MessageError {
+  title: string
+  body?: string
+}
+
 // Chat message types for UI state
 export interface ChatMessage {
   id: string
@@ -127,6 +133,7 @@ export interface ChatMessage {
   toolCalls?: ToolCall[]
   steps?: Step[]
   contentBlocks?: ContentBlock[] // Ordered list of content blocks for rendering
+  error?: MessageError // Error to display instead of content
 }
 
 export interface ToolCall {
