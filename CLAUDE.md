@@ -9,15 +9,16 @@ PatternFly Chatbot PoC for ag-ui protocol integration. Demonstrates tools, steps
 ## Commands
 
 ```bash
-pnpm dev        # Start dev server on :3000
-pnpm build      # Production build (runs tsc -b first)
-pnpm lint       # Run ESLint
-pnpm preview    # Preview production build
+make dev        # Start dev server on :3000
+make build      # Production build (runs tsc -b first)
+make lint       # Run ESLint
+make preview    # Preview production build
+make clean      # Remove dist/ and node_modules/
 ```
 
 ## Debugging
 
-- VS Code: Run & Debug (F5) → "Debug in Chrome". Start `pnpm dev` first.
+- VS Code: Run & Debug (F5) → "Debug in Chrome". Start `make dev` first.
 - Browser console shows `[AG-UI] OUT:` (requests) and `[AG-UI] IN:` (events) when not in demo mode.
 
 ## Key Files

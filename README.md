@@ -5,8 +5,8 @@ PoC chat interface using PatternFly Chatbot with ag-ui protocol support.
 ## Quick Start
 
 ```bash
-pnpm install
-pnpm dev        # http://localhost:3000
+make install
+make dev        # http://localhost:3000
 ```
 
 ## Tech Stack
@@ -28,8 +28,9 @@ Enabled by default. Set `DEMO_MODE = false` in `src/App.tsx` to connect to a rea
 ## Build
 
 ```bash
-pnpm build      # Production build in dist/
-pnpm lint       # ESLint check
+make build      # Production build in dist/
+make lint       # ESLint check
+make clean      # Remove dist/ and node_modules/
 ```
 
 ## Backend Proxy

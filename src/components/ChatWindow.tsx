@@ -5,7 +5,6 @@ import {
   ChatbotContent,
   ChatbotHeader,
   ChatbotHeaderMain,
-  ChatbotHeaderTitle,
   ChatbotHeaderActions,
   ChatbotHeaderOptionsDropdown,
   ChatbotFooter,
@@ -102,9 +101,7 @@ export function ChatWindow({
     <Chatbot displayMode={ChatbotDisplayMode.fullscreen}>
       <ChatbotHeader>
         <ChatbotHeaderMain>
-          <ChatbotHeaderTitle>
-            Observability Assistant
-          </ChatbotHeaderTitle>
+          <span className="header-branding__title">Observability Assistant PoC</span>
         </ChatbotHeaderMain>
         <ChatbotHeaderActions>
           <ChatbotHeaderOptionsDropdown onSelect={onSelectTheme}>
