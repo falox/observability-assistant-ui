@@ -241,7 +241,7 @@ Iterates `contentBlocks[]` in order:
 {contentBlocks.map(block => {
   switch (block.type) {
     case 'text':
-      return <ReactMarkdown>{block.content}</ReactMarkdown>;
+      return <TextWithCharts content={block.content} toolCalls={toolCalls} />;
     case 'steps':
       return <StepsList steps={steps} />;
     case 'tools':
@@ -249,6 +249,14 @@ Iterates `contentBlocks[]` in order:
   }
 })}
 ```
+
+### TextWithCharts
+
+Parses text for chart placeholders and renders embedded charts:
+
+1. Splits content by `<<{...}>>` placeholders
+2. Renders text segments as `MarkdownContent` (PatternFly)
+3. For `promql` placeholders, looks up tool call by ID and renders `TimeSeriesChart`
 
 ### StepsList
 
@@ -268,11 +276,10 @@ Renders PatternFly `ToolResponse` (collapsible):
 
 ### Markdown Rendering
 
-Uses `react-markdown` with custom PatternFly components:
-- `p` → PatternFly `Content`
-- `code` → `CodeBlockWithCopy` (with copy button for multi-line)
-- `ul/ol` → PatternFly `List`
-- `li` → PatternFly `ListItem`
+Uses PatternFly's `MarkdownContent` component which provides:
+- GFM (GitHub Flavored Markdown) support including tables
+- Syntax highlighting for code blocks
+- Consistent PatternFly styling
 
 ## Error Handling
 

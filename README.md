@@ -1,6 +1,6 @@
 # Observability Assistant UI
 
-PoC chat interface using PatternFly Chatbot with ag-ui protocol support.
+Chat interface for observability AI assistant using [PatternFly Chatbot](https://www.patternfly.org/patternfly-ai/chatbot/overview) with [ag-ui protocol](https://docs.ag-ui.com) support.
 
 ## Quick Start
 
@@ -11,19 +11,33 @@ make dev        # http://localhost:3000
 
 ## Tech Stack
 
-- React 18 + TypeScript + Vite
-- PatternFly 6 + @patternfly/chatbot
+- [React](https://react.dev) 18 + [TypeScript](https://www.typescriptlang.org) + [Vite](https://vite.dev)
+- [PatternFly](https://www.patternfly.org) 6 + [@patternfly/chatbot](https://www.patternfly.org/patternfly-ai/chatbot/overview)
 
 ## Features
 
-- Markdown rendering (tables, code blocks, lists)
-- Tool calls with arguments and results
+- Markdown rendering (GFM tables, code blocks, lists)
+- Tool calls with arguments and results (collapsed by default)
 - Step/thinking progress indicators
+- Time series charts for Prometheus metrics
 - SSE streaming from ag-ui servers
+- Light/dark/system theme support
 
 ## Demo Mode
 
-Enabled by default. Set `DEMO_MODE = false` in `src/App.tsx` to connect to a real backend.
+Toggle between Demo and Production mode via the settings dropdown in the header. Demo mode is enabled by default and simulates all event types without requiring a backend.
+
+Type a space-separated sequence of keywords to test different UI elements:
+
+| Keyword | Effect |
+|---------|--------|
+| `step` | Progress stepper (3 steps) |
+| `tool` | Tool call with parameters and result |
+| `text` | Streaming text paragraph |
+| `code` | Text with code block |
+| `error` | Inline error alert |
+
+Example: `step tool text code`
 
 ## Build
 
@@ -35,12 +49,12 @@ make clean      # Remove dist/ and node_modules/
 
 ## Backend Proxy
 
-Configure in `vite.config.ts`:
+Configure the backend URL in `vite.config.ts`:
 
 ```ts
 proxy: {
   '/api': {
-    target: 'http://localhost:8080',
+    target: 'http://localhost:5050',
     changeOrigin: true,
   },
 }

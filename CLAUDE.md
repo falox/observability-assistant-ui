@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PatternFly Chatbot PoC for ag-ui protocol integration. Demonstrates tools, steps, and markdown rendering.
+Chat interface for an observability AI assistant using PatternFly Chatbot with ag-ui protocol integration. Renders markdown, tool calls, steps, and Prometheus time series charts.
 
 ## Commands
 
@@ -27,7 +27,8 @@ make clean      # Remove dist/ and node_modules/
 |------|---------|
 | `src/App.tsx` | Main app, demo/prod mode toggle (persisted in localStorage) |
 | `src/components/ChatWindow.tsx` | Chat layout (header, content, footer) |
-| `src/components/MessageList.tsx` | Message rendering with tools/steps/errors |
+| `src/components/MessageList.tsx` | Message rendering with tools/steps/errors/charts |
+| `src/components/TimeSeriesChart.tsx` | Prometheus metrics visualization |
 | `src/hooks/useAgUiStream.ts` | ag-ui SSE streaming hook and event processing |
 | `src/types/agui.ts` | ag-ui event type definitions |
 | `vite.config.ts` | Dev server proxy configuration |
@@ -127,3 +128,17 @@ proxy: {
 - Stored in localStorage under `app-mode` key (`'demo'` | `'prod'`)
 - Defaults to demo mode if not set
 - UI toggle in ChatWindow header switches between modes
+
+### Prometheus Chart Rendering
+
+**Decision:** Use placeholder pattern in text to reference tool call results for chart rendering.
+
+**Rationale:** The LLM can embed chart references inline with explanatory text. The UI parses these placeholders and renders charts at the correct position in the message flow.
+
+**Placeholder format:** `<<{"type": "promql", "tool_name": "...", "tool_call_id": "..."}>>`
+
+**Implementation:**
+- `MessageList.tsx` parses placeholders via regex
+- Looks up tool call by ID to get Prometheus matrix data
+- Renders `TimeSeriesChart` component with Victory.js charts
+- Shows loading spinner if tool result not yet available
