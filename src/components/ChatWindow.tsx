@@ -101,7 +101,7 @@ export function ChatWindow({
     <Chatbot displayMode={ChatbotDisplayMode.fullscreen}>
       <ChatbotHeader>
         <ChatbotHeaderMain>
-          <span className="header-branding__title">Observability Assistant PoC</span>
+          <span className="header-branding__title">Observability Assistant</span>
         </ChatbotHeaderMain>
         <ChatbotHeaderActions>
           <ChatbotHeaderOptionsDropdown onSelect={onSelectTheme}>

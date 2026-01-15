@@ -24,11 +24,17 @@
 
 .header-branding__title {
   font-family: var(--rh-font-family-heading, 'Red Hat Display', sans-serif);
-  font-weight: 500;
-  font-size: 1.1rem;
+  font-weight: 700;
+  font-size: 1.25rem;
   display: flex;
   align-items: center;
   height: 100%;
+}
+
+/* Center the header content */
+.pf-chatbot__header-main {
+  flex: 1;
+  justify-content: center;
 }
 
 body {
@@ -48,4 +54,10 @@ body {
   white-space: pre !important;
   overflow-wrap: normal !important;
   word-break: normal !important;
+}
+
+/* Chart dark mode support - Victory charts use SVG text which needs explicit color */
+.pf-v6-theme-dark svg text,
+.pf-v6-theme-dark svg tspan {
+  fill: #f0f0f0 !important;
 }
