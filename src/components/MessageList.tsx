@@ -3,105 +3,26 @@ import {
   Message,
   MessageBox,
   ToolResponse,
+  MarkdownContent,
 } from '@patternfly/chatbot'
 import {
   CodeBlock,
   CodeBlockCode,
-  CodeBlockAction,
-  Button,
-  Tooltip,
   Spinner,
   ProgressStepper,
   ProgressStep,
-  Content,
-  ContentVariants,
-  List,
-  ListItem,
-  ListComponent,
-  getUniqueId,
   Alert,
   AlertVariant,
 } from '@patternfly/react-core'
 import {
   CheckCircleIcon,
   OutlinedCircleIcon,
-  CopyIcon,
-  CheckIcon,
 } from '@patternfly/react-icons'
-import ReactMarkdown, { Components } from 'react-markdown'
 import type { ChatMessage, Step, ToolCall, ContentBlock } from '../types/agui'
 
 // Standard PatternFly chatbot avatars
 import userAvatar from '../assets/user_avatar.svg'
 import patternflyAvatar from '../assets/patternfly_avatar.jpg'
-
-// Code block component with copy button for markdown rendering
-function CodeBlockWithCopy({ children, className }: { children: React.ReactNode; className?: string }) {
-  const [copied, setCopied] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const tooltipId = getUniqueId()
-
-  const language = /language-(\w+)/.exec(className || '')?.[1]
-  const codeString = String(children).replace(/\n$/, '')
-
-  // For inline code (no newlines), render as simple code element
-  if (!String(children).includes('\n')) {
-    return <code className="pf-chatbot__message-inline-code">{children}</code>
-  }
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(codeString)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 3000)
-  }
-
-  const actions = (
-    <CodeBlockAction>
-      {language && <div className="pf-chatbot__message-code-block-language">{language}</div>}
-      <Button
-        ref={buttonRef}
-        aria-label="Copy code"
-        variant="plain"
-        className="pf-chatbot__button--copy"
-        onClick={handleCopy}
-      >
-        {copied ? <CheckIcon /> : <CopyIcon />}
-      </Button>
-      <Tooltip id={tooltipId} content="Copy" position="top" triggerRef={buttonRef} />
-    </CodeBlockAction>
-  )
-
-  return (
-    <div className="pf-chatbot__message-code-block">
-      <CodeBlock actions={actions}>
-        <CodeBlockCode>{codeString}</CodeBlockCode>
-      </CodeBlock>
-    </div>
-  )
-}
-
-// Custom components for ReactMarkdown to use PatternFly styling
-const markdownComponents: Components = {
-  p: ({ children }) => (
-    <span className="pf-chatbot__message-text">
-      <Content component={ContentVariants.p}>{children}</Content>
-    </span>
-  ),
-  code: ({ children, className }) => (
-    <CodeBlockWithCopy className={className}>{children}</CodeBlockWithCopy>
-  ),
-  ul: ({ children }) => (
-    <div className="pf-chatbot__message-unordered-list">
-      <List>{children}</List>
-    </div>
-  ),
-  ol: ({ children }) => (
-    <div className="pf-chatbot__message-ordered-list">
-      <List component={ListComponent.ol}>{children}</List>
-    </div>
-  ),
-  li: ({ children }) => <ListItem>{children}</ListItem>,
-}
 
 // Component for steps display
 function StepsList({ steps }: { steps: Step[] }) {
@@ -207,9 +128,7 @@ function ContentBlockRenderer({
         switch (block.type) {
           case 'text':
             return block.content ? (
-              <ReactMarkdown key={block.id} components={markdownComponents}>
-                {block.content}
-              </ReactMarkdown>
+              <MarkdownContent key={block.id} content={block.content} />
             ) : null
           case 'steps':
             return steps.length > 0 ? <StepsList key={block.id} steps={steps} /> : null
