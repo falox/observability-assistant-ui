@@ -20,6 +20,7 @@ export type AgUiEventType =
   | 'STATE_DELTA'
   | 'MESSAGES_SNAPSHOT'
   | 'RAW'
+  | 'CUSTOM'
 
 export interface BaseEvent {
   type: AgUiEventType
@@ -98,6 +99,17 @@ export interface StepFinishedEvent extends BaseEvent {
   stepId?: string
 }
 
+// Custom event for step status updates
+export interface StepUpdateCustomEvent extends BaseEvent {
+  type: 'CUSTOM'
+  name: 'step_update'
+  value: {
+    stepName: string
+    status: 'in_progress' | 'failed'
+    activeForm: string
+  }
+}
+
 export type AgUiEvent =
   | RunStartedEvent
   | RunFinishedEvent
@@ -111,6 +123,7 @@ export type AgUiEvent =
   | ToolCallResultEvent
   | StepStartedEvent
   | StepFinishedEvent
+  | StepUpdateCustomEvent
 
 // Content block types for ordered rendering
 export type ContentBlock =
@@ -147,5 +160,6 @@ export interface ToolCall {
 export interface Step {
   id: string
   name: string
-  status: 'pending' | 'in-progress' | 'done'
+  status: 'pending' | 'in-progress' | 'done' | 'failed'
+  activeForm?: string // Display text while step is in progress
 }

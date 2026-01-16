@@ -17,6 +17,8 @@ import {
 import {
   CheckCircleIcon,
   OutlinedCircleIcon,
+  ExclamationCircleIcon,
+  InProgressIcon,
 } from '@patternfly/react-icons'
 import type { ChatMessage, Step, ToolCall, ContentBlock } from '../types/agui'
 import { TimeSeriesChart, PrometheusToolResult } from './TimeSeriesChart'
@@ -102,8 +104,6 @@ function TextWithCharts({
       const placeholder = parsePlaceholder(match[1])
       if (placeholder && placeholder.type === 'promql') {
         const toolCall = toolCallMap.get(placeholder.tool_call_id)
-        console.log('[Chart] Looking for tool call:', placeholder.tool_call_id, 'Found:', toolCall ? { id: toolCall.id, name: toolCall.name, hasResult: !!toolCall.result, hasArgs: !!toolCall.args, resultLength: toolCall.result?.length, argsLength: toolCall.args?.length } : 'not found')
-
         // Try to get chart data from either result or args
         let chartData: PrometheusToolResult | null = null
         if (toolCall?.result) {
@@ -118,9 +118,6 @@ function TextWithCharts({
           result.push(
             <TimeSeriesChart key={`chart-${placeholder.tool_call_id}`} data={chartData} />
           )
-        } else if (toolCall?.result || toolCall?.args) {
-          // Tool has data but it's not valid Prometheus matrix format
-          console.warn('[Chart] Tool data is not valid Prometheus matrix data:', placeholder.tool_call_id)
         } else if (toolCall) {
           // Tool call exists but result not yet available - show loading
           result.push(
@@ -159,20 +156,54 @@ function TextWithCharts({
   return <>{parts}</>
 }
 
+// Get step icon based on status
+function getStepIcon(status: Step['status']) {
+  switch (status) {
+    case 'done':
+      return <CheckCircleIcon />
+    case 'in-progress':
+      return <InProgressIcon className="pf-v6-u-icon-spin" />
+    case 'failed':
+      return <ExclamationCircleIcon />
+    case 'pending':
+    default:
+      return <OutlinedCircleIcon />
+  }
+}
+
+// Get step variant based on status
+function getStepVariant(status: Step['status']): 'success' | 'danger' | 'pending' | 'info' {
+  switch (status) {
+    case 'done':
+      return 'success'
+    case 'failed':
+      return 'danger'
+    case 'in-progress':
+      return 'info'
+    case 'pending':
+    default:
+      return 'pending'
+  }
+}
+
 // Component for steps display
 function StepsList({ steps }: { steps: Step[] }) {
   return (
     <ProgressStepper isVertical>
       {steps.map((step) => {
-        const isDone = step.status === 'done'
+        // Display activeForm text when in-progress, otherwise show step name
+        const displayText = step.status === 'in-progress' && step.activeForm
+          ? step.activeForm
+          : step.name
+
         return (
           <ProgressStep
             key={step.id}
-            variant={isDone ? 'success' : 'pending'}
-            icon={isDone ? <CheckCircleIcon /> : <OutlinedCircleIcon />}
+            variant={getStepVariant(step.status)}
+            icon={getStepIcon(step.status)}
             aria-label={`${step.name}: ${step.status}`}
           >
-            {step.name}
+            {displayText}
           </ProgressStep>
         )
       })}

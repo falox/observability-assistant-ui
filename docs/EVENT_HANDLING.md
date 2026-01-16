@@ -53,8 +53,17 @@ The protocol defines 13 event types in `src/types/agui.ts`:
 
 | Event | Fields | Description |
 |-------|--------|-------------|
-| `STEP_STARTED` | `stepName`, `stepId?` | Creates step with 'in-progress' status |
-| `STEP_FINISHED` | `stepName`, `stepId?` | Sets step status to 'done' |
+| `STEP_STARTED` | `stepName`, `stepId?` | Creates step with 'pending' status (if not exists) |
+| `STEP_FINISHED` | `stepName`, `stepId?` | Sets step status to 'done' (unless failed) |
+| `CUSTOM` (step_update) | `name`, `value: {stepName, status, activeForm}` | Updates step status and display text |
+
+### Custom Events
+
+The `CUSTOM` event type allows backend-defined extensions. Currently supported:
+
+| name | value | Description |
+|------|-------|-------------|
+| `step_update` | `{stepName, status, activeForm}` | Updates step status and active display text |
 
 ### Unused Events
 
@@ -146,9 +155,35 @@ interface ToolCall {
 interface Step {
   id: string;
   name: string;
-  status: 'pending' | 'in-progress' | 'done';
+  status: 'pending' | 'in-progress' | 'done' | 'failed';
+  activeForm?: string;  // Display text while step is in progress
 }
 ```
+
+**Status priority:** `failed` > `done` > `in-progress` > `pending`
+
+Status can only progress forward (higher priority), never regress. This prevents out-of-order events from incorrectly reverting step state.
+
+### Step Lifecycle
+
+Steps support a rich lifecycle with dynamic status updates:
+
+```
+STEP_STARTED (creates step as 'pending')
+         ↓
+CUSTOM step_update (status: 'in_progress', activeForm: 'Analyzing data...')
+         ↓
+CUSTOM step_update (status: 'in_progress', activeForm: 'Processing results...')
+         ↓
+STEP_FINISHED (status: 'done') or CUSTOM step_update (status: 'failed')
+```
+
+**Key behaviors:**
+
+1. **Lazy creation**: Steps are created on first encounter (STEP_STARTED or CUSTOM step_update)
+2. **Out-of-order tolerance**: If CUSTOM step_update arrives before STEP_STARTED, the step is created automatically
+3. **activeForm display**: When a step is `in-progress`, the UI shows `activeForm` text instead of the step name (e.g., "Analyzing metrics..." instead of "Analysis")
+4. **Status immutability**: Once a step reaches `failed`, it cannot change. Once `done`, it can only become `failed`.
 
 ## Event Processing Details
 
@@ -184,12 +219,17 @@ switch (event.type) {
     break;
 
   case 'STEP_STARTED':
-    // Create Step in stepsRef
+    // Create Step in stepsRef with 'pending' status (if not exists)
     // Add 'steps' block to contentBlocksRef if first step
     break;
 
   case 'STEP_FINISHED':
-    // Set step.status = 'done'
+    // Set step.status = 'done' (unless already 'failed')
+    break;
+
+  case 'CUSTOM':
+    // Handle step_update: update status and activeForm
+    // Respects status priority (failed > done > in-progress > pending)
     break;
 
   case 'RUN_FINISHED':
@@ -262,8 +302,9 @@ Parses text for chart placeholders and renders embedded charts:
 
 Renders PatternFly `ProgressStepper`:
 - `done` status → CheckCircle icon, success variant
-- `in-progress` status → InProgress icon
-- `pending` status → OutlinedCircle icon
+- `in-progress` status → InProgress icon (spinning), info variant, displays `activeForm` text if set
+- `failed` status → ExclamationCircle icon, danger variant
+- `pending` status → OutlinedCircle icon, pending variant
 
 ### ToolCallsList / ToolCallItem
 

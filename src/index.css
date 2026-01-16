@@ -61,3 +61,17 @@ body {
 .pf-v6-theme-dark svg tspan {
   fill: #f0f0f0 !important;
 }
+
+/* Spinning animation for in-progress step icons */
+@keyframes pf-v6-icon-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pf-v6-u-icon-spin {
+  animation: pf-v6-icon-spin 1s linear infinite;
+}

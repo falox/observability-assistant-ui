@@ -192,22 +192,19 @@ export function useAgUiStream(
             contentBlocksRef.current.push({ type: 'steps', id: 'steps' })
           }
           const stepId = event.stepId || event.stepName
-          // Mark any currently in-progress steps as pending (only one active at a time)
-          for (const step of stepsRef.current.values()) {
-            if (step.status === 'in-progress') {
-              step.status = 'pending'
+          // Only create step if it doesn't exist (tolerate out-of-order events)
+          if (!stepsRef.current.has(stepId)) {
+            const step: Step = {
+              id: stepId,
+              name: event.stepName,
+              status: 'pending',
             }
+            stepsRef.current.set(stepId, step)
+            updateCurrentMessage({
+              steps: Array.from(stepsRef.current.values()),
+              contentBlocks: [...contentBlocksRef.current],
+            })
           }
-          const step: Step = {
-            id: stepId,
-            name: event.stepName,
-            status: 'in-progress',
-          }
-          stepsRef.current.set(stepId, step)
-          updateCurrentMessage({
-            steps: Array.from(stepsRef.current.values()),
-            contentBlocks: [...contentBlocksRef.current],
-          })
           break
         }
 
@@ -215,10 +212,62 @@ export function useAgUiStream(
           const stepId = event.stepId || event.stepName
           const step = stepsRef.current.get(stepId)
           if (step) {
-            step.status = 'done'
-            updateCurrentMessage({
-              steps: Array.from(stepsRef.current.values()),
-            })
+            // Only update if current status allows (priority: failed > done > in-progress > pending)
+            // done can only be set if status is not 'failed'
+            if (step.status !== 'failed') {
+              step.status = 'done'
+              step.activeForm = undefined
+              updateCurrentMessage({
+                steps: Array.from(stepsRef.current.values()),
+              })
+            }
+          }
+          break
+        }
+
+        case 'CUSTOM': {
+          // Handle step_update custom event
+          if (event.name === 'step_update') {
+            const { stepName, status, activeForm } = event.value
+            const stepId = stepName // Use stepName as ID for lookup
+            let step = stepsRef.current.get(stepId)
+
+            // Create step if it doesn't exist (tolerate out-of-order events)
+            if (!step) {
+              ensureAssistantMessage()
+              if (!hasStepsBlockRef.current) {
+                hasStepsBlockRef.current = true
+                contentBlocksRef.current.push({ type: 'steps', id: 'steps' })
+              }
+              step = {
+                id: stepId,
+                name: stepName,
+                status: 'pending',
+              }
+              stepsRef.current.set(stepId, step)
+            }
+
+            // State priority: failed > done > in-progress > pending
+            // Only update if new status has higher or equal priority
+            const statusPriority: Record<string, number> = {
+              'pending': 0,
+              'in-progress': 1,
+              'done': 2,
+              'failed': 3,
+            }
+
+            const newStatus = status === 'in_progress' ? 'in-progress' : status
+            const currentPriority = statusPriority[step.status] ?? 0
+            const newPriority = statusPriority[newStatus] ?? 0
+
+            if (newPriority >= currentPriority) {
+              step.status = newStatus as Step['status']
+              step.activeForm = activeForm || undefined
+              updateCurrentMessage({
+                steps: Array.from(stepsRef.current.values()),
+                contentBlocks: [...contentBlocksRef.current],
+              })
+            }
           }
           break
         }
