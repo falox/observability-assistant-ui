@@ -192,8 +192,10 @@ export function useAgUiStream(
             contentBlocksRef.current.push({ type: 'steps', id: 'steps' })
           }
           const stepId = event.stepId || event.stepName
-          // Only create step if it doesn't exist (tolerate out-of-order events)
-          if (!stepsRef.current.has(stepId)) {
+          const existingStep = stepsRef.current.get(stepId)
+
+          if (!existingStep) {
+            // Create new step with 'pending' status
             const step: Step = {
               id: stepId,
               name: event.stepName,
@@ -205,22 +207,48 @@ export function useAgUiStream(
               contentBlocks: [...contentBlocksRef.current],
             })
           }
+          // If step already exists, don't update - STEP_STARTED has lowest priority (pending)
+          // and out-of-order events may have already set a higher priority status
           break
         }
 
         case 'STEP_FINISHED': {
           const stepId = event.stepId || event.stepName
-          const step = stepsRef.current.get(stepId)
-          if (step) {
-            // Only update if current status allows (priority: failed > done > in-progress > pending)
-            // done can only be set if status is not 'failed'
-            if (step.status !== 'failed') {
-              step.status = 'done'
-              step.activeForm = undefined
-              updateCurrentMessage({
-                steps: Array.from(stepsRef.current.values()),
-              })
+          let step = stepsRef.current.get(stepId)
+
+          // Create step if it doesn't exist (tolerate out-of-order events)
+          if (!step) {
+            ensureAssistantMessage()
+            if (!hasStepsBlockRef.current) {
+              hasStepsBlockRef.current = true
+              contentBlocksRef.current.push({ type: 'steps', id: 'steps' })
             }
+            step = {
+              id: stepId,
+              name: event.stepName,
+              status: 'pending',
+            }
+            stepsRef.current.set(stepId, step)
+          }
+
+          // Status priority: pending=0, in-progress=1, done=2, failed=3
+          // Only update to 'done' if current status has lower priority
+          const statusPriority: Record<string, number> = {
+            'pending': 0,
+            'in-progress': 1,
+            'done': 2,
+            'failed': 3,
+          }
+          const currentPriority = statusPriority[step.status] ?? 0
+          const donePriority = statusPriority['done']
+
+          if (donePriority >= currentPriority) {
+            step.status = 'done'
+            step.activeForm = undefined
+            updateCurrentMessage({
+              steps: Array.from(stepsRef.current.values()),
+              contentBlocks: [...contentBlocksRef.current],
+            })
           }
           break
         }
