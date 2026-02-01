@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef } from 'react'
-import type { AgUiEvent, ChatMessage, ToolCall, Step, ContentBlock } from '../types/agui'
+import { useState, useCallback, useRef, useMemo } from 'react'
+import { HttpAgent, type AgentSubscriber } from '@ag-ui/client'
+import type { ChatMessage, ToolCall, Step, ContentBlock, StepUpdatePayload } from '../types/agui'
 
 interface UseAgUiStreamOptions {
   endpoint?: string
@@ -24,7 +25,6 @@ export function useAgUiStream(
   const [runActive, setRunActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const abortControllerRef = useRef<AbortController | null>(null)
   const currentMessageRef = useRef<ChatMessage | null>(null)
   const toolCallsRef = useRef<Map<string, ToolCall>>(new Map())
   const stepsRef = useRef<Map<string, Step>>(new Map())
@@ -32,6 +32,14 @@ export function useAgUiStream(
   const currentTextBlockIdRef = useRef<string | null>(null)
   const hasStepsBlockRef = useRef(false)
   const hasToolsBlockRef = useRef(false)
+
+  // Create HttpAgent instance with a unique threadId
+  const agent = useMemo(() => {
+    return new HttpAgent({
+      url: endpoint,
+      threadId: `thread-${Date.now()}`,
+    })
+  }, [endpoint])
 
   // Ensures an assistant message exists, creating one if needed
   const ensureAssistantMessage = useCallback(() => {
@@ -81,267 +89,239 @@ export function useAgUiStream(
     })
   }, [])
 
-  const handleEvent = useCallback(
-    (event: AgUiEvent) => {
-      switch (event.type) {
-        case 'RUN_STARTED': {
-          setRunActive(true)
-          break
-        }
+  // Create subscriber for handling ag-ui events
+  const createSubscriber = useCallback((): AgentSubscriber => {
+    // Status priority for step updates
+    const statusPriority: Record<string, number> = {
+      'pending': 0,
+      'in-progress': 1,
+      'done': 2,
+      'failed': 3,
+    }
 
-        case 'TEXT_MESSAGE_START': {
-          // Always create a new message for each TEXT_MESSAGE_START
-          // This ensures each text block gets its own "balloon"
+    return {
+    onRunStartedEvent: () => {
+      setRunActive(true)
+    },
+
+    onTextMessageStartEvent: () => {
+      ensureAssistantMessage()
+      // Create a new text block
+      const textBlockId = `text-${Date.now()}`
+      currentTextBlockIdRef.current = textBlockId
+      contentBlocksRef.current.push({ type: 'text', id: textBlockId, content: '' })
+      updateCurrentMessage({
+        contentBlocks: [...contentBlocksRef.current],
+      })
+    },
+
+    onTextMessageContentEvent: ({ event }) => {
+      ensureAssistantMessage()
+      // Update the current text block content
+      const textBlockId = currentTextBlockIdRef.current
+      if (textBlockId) {
+        const textBlock = contentBlocksRef.current.find(
+          (b): b is ContentBlock & { type: 'text' } => b.type === 'text' && b.id === textBlockId
+        )
+        if (textBlock) {
+          textBlock.content += event.delta
+        }
+      }
+      updateCurrentMessage({
+        content: (currentMessageRef.current?.content || '') + event.delta,
+        contentBlocks: [...contentBlocksRef.current],
+      })
+    },
+
+    onTextMessageEndEvent: () => {
+      // End the current text block, but keep the message and refs active
+      currentTextBlockIdRef.current = null
+    },
+
+    onToolCallStartEvent: ({ event }) => {
+      ensureAssistantMessage()
+      // Add tools block if this is the first tool call
+      if (!hasToolsBlockRef.current) {
+        hasToolsBlockRef.current = true
+        contentBlocksRef.current.push({ type: 'tools', id: 'tools' })
+      }
+      const toolCall: ToolCall = {
+        id: event.toolCallId,
+        name: event.toolCallName,
+        args: '',
+        isLoading: true,
+      }
+      toolCallsRef.current.set(event.toolCallId, toolCall)
+      updateCurrentMessage({
+        toolCalls: Array.from(toolCallsRef.current.values()),
+        contentBlocks: [...contentBlocksRef.current],
+      })
+    },
+
+    onToolCallArgsEvent: ({ event }) => {
+      const toolCall = toolCallsRef.current.get(event.toolCallId)
+      if (toolCall) {
+        toolCall.args += event.delta
+        updateCurrentMessage({
+          toolCalls: Array.from(toolCallsRef.current.values()),
+        })
+      }
+    },
+
+    onToolCallEndEvent: ({ event }) => {
+      const toolCall = toolCallsRef.current.get(event.toolCallId)
+      if (toolCall) {
+        toolCall.isLoading = false
+        updateCurrentMessage({
+          toolCalls: Array.from(toolCallsRef.current.values()),
+        })
+      }
+    },
+
+    onToolCallResultEvent: ({ event }) => {
+      const toolCall = toolCallsRef.current.get(event.toolCallId)
+      if (toolCall) {
+        toolCall.result = event.content
+        toolCall.isLoading = false
+        updateCurrentMessage({
+          toolCalls: Array.from(toolCallsRef.current.values()),
+        })
+      }
+    },
+
+    onStepStartedEvent: ({ event }) => {
+      ensureAssistantMessage()
+      // Add steps block if this is the first step
+      if (!hasStepsBlockRef.current) {
+        hasStepsBlockRef.current = true
+        contentBlocksRef.current.push({ type: 'steps', id: 'steps' })
+      }
+      // Use stepName as the step ID
+      const stepId = event.stepName
+      const existingStep = stepsRef.current.get(stepId)
+
+      if (!existingStep) {
+        // Create new step with 'pending' status
+        const step: Step = {
+          id: stepId,
+          name: event.stepName,
+          status: 'pending',
+        }
+        stepsRef.current.set(stepId, step)
+        updateCurrentMessage({
+          steps: Array.from(stepsRef.current.values()),
+          contentBlocks: [...contentBlocksRef.current],
+        })
+      }
+    },
+
+    onStepFinishedEvent: ({ event }) => {
+      // Use stepName as the step ID
+      const stepId = event.stepName
+      let step = stepsRef.current.get(stepId)
+
+      // Create step if it doesn't exist (tolerate out-of-order events)
+      if (!step) {
+        ensureAssistantMessage()
+        if (!hasStepsBlockRef.current) {
+          hasStepsBlockRef.current = true
+          contentBlocksRef.current.push({ type: 'steps', id: 'steps' })
+        }
+        step = {
+          id: stepId,
+          name: event.stepName,
+          status: 'pending',
+        }
+        stepsRef.current.set(stepId, step)
+      }
+
+      // Only update to 'done' if current status has lower priority
+      const currentPriority = statusPriority[step.status] ?? 0
+      const donePriority = statusPriority['done']
+
+      if (donePriority >= currentPriority) {
+        step.status = 'done'
+        step.activeForm = undefined
+        updateCurrentMessage({
+          steps: Array.from(stepsRef.current.values()),
+          contentBlocks: [...contentBlocksRef.current],
+        })
+      }
+    },
+
+    onCustomEvent: ({ event }) => {
+      // Handle step_update custom event
+      if (event.name === 'step_update') {
+        const { stepName, status, activeForm } = event.value as StepUpdatePayload
+        const stepId = stepName
+        let step = stepsRef.current.get(stepId)
+
+        // Create step if it doesn't exist
+        if (!step) {
           ensureAssistantMessage()
-          // Create a new text block
-          const textBlockId = `text-${Date.now()}`
-          currentTextBlockIdRef.current = textBlockId
-          contentBlocksRef.current.push({ type: 'text', id: textBlockId, content: '' })
-          updateCurrentMessage({
-            contentBlocks: [...contentBlocksRef.current],
-          })
-          break
-        }
-
-        case 'TEXT_MESSAGE_CONTENT': {
-          ensureAssistantMessage()
-          // Update the current text block content
-          const textBlockId = currentTextBlockIdRef.current
-          if (textBlockId) {
-            const textBlock = contentBlocksRef.current.find(
-              (b): b is ContentBlock & { type: 'text' } => b.type === 'text' && b.id === textBlockId
-            )
-            if (textBlock) {
-              textBlock.content += event.delta
-            }
-          }
-          updateCurrentMessage({
-            content: (currentMessageRef.current?.content || '') + event.delta,
-            contentBlocks: [...contentBlocksRef.current],
-          })
-          break
-        }
-
-        case 'TEXT_MESSAGE_END': {
-          // End the current text block, but keep the message and refs active
-          // so that subsequent tool results can still update the same message
-          currentTextBlockIdRef.current = null
-          break
-        }
-
-        case 'TOOL_CALL_START': {
-          ensureAssistantMessage()
-          // Add tools block if this is the first tool call
-          if (!hasToolsBlockRef.current) {
-            hasToolsBlockRef.current = true
-            contentBlocksRef.current.push({ type: 'tools', id: 'tools' })
-          }
-          const toolCall: ToolCall = {
-            id: event.toolCallId,
-            name: event.toolCallName,
-            args: '',
-            isLoading: true,
-          }
-          toolCallsRef.current.set(event.toolCallId, toolCall)
-          updateCurrentMessage({
-            toolCalls: Array.from(toolCallsRef.current.values()),
-            contentBlocks: [...contentBlocksRef.current],
-          })
-          break
-        }
-
-        case 'TOOL_CALL_ARGS': {
-          const toolCall = toolCallsRef.current.get(event.toolCallId)
-          if (toolCall) {
-            toolCall.args += event.delta
-            updateCurrentMessage({
-              toolCalls: Array.from(toolCallsRef.current.values()),
-            })
-          }
-          break
-        }
-
-        case 'TOOL_CALL_END': {
-          const toolCall = toolCallsRef.current.get(event.toolCallId)
-          if (toolCall) {
-            toolCall.isLoading = false
-            updateCurrentMessage({
-              toolCalls: Array.from(toolCallsRef.current.values()),
-            })
-          }
-          break
-        }
-
-        case 'TOOL_CALL_RESULT': {
-          const toolCall = toolCallsRef.current.get(event.toolCallId)
-          if (toolCall) {
-            toolCall.result = event.content
-            toolCall.isLoading = false
-            updateCurrentMessage({
-              toolCalls: Array.from(toolCallsRef.current.values()),
-            })
-          }
-          break
-        }
-
-        case 'STEP_STARTED': {
-          ensureAssistantMessage()
-          // Add steps block if this is the first step
           if (!hasStepsBlockRef.current) {
             hasStepsBlockRef.current = true
             contentBlocksRef.current.push({ type: 'steps', id: 'steps' })
           }
-          const stepId = event.stepId || event.stepName
-          const existingStep = stepsRef.current.get(stepId)
-
-          if (!existingStep) {
-            // Create new step with 'pending' status
-            const step: Step = {
-              id: stepId,
-              name: event.stepName,
-              status: 'pending',
-            }
-            stepsRef.current.set(stepId, step)
-            updateCurrentMessage({
-              steps: Array.from(stepsRef.current.values()),
-              contentBlocks: [...contentBlocksRef.current],
-            })
+          step = {
+            id: stepId,
+            name: stepName,
+            status: 'pending',
           }
-          // If step already exists, don't update - STEP_STARTED has lowest priority (pending)
-          // and out-of-order events may have already set a higher priority status
-          break
+          stepsRef.current.set(stepId, step)
         }
 
-        case 'STEP_FINISHED': {
-          const stepId = event.stepId || event.stepName
-          let step = stepsRef.current.get(stepId)
+        const newStatus = status === 'in_progress' ? 'in-progress' : status
+        const currentPriority = statusPriority[step.status] ?? 0
+        const newPriority = statusPriority[newStatus] ?? 0
 
-          // Create step if it doesn't exist (tolerate out-of-order events)
-          if (!step) {
-            ensureAssistantMessage()
-            if (!hasStepsBlockRef.current) {
-              hasStepsBlockRef.current = true
-              contentBlocksRef.current.push({ type: 'steps', id: 'steps' })
-            }
-            step = {
-              id: stepId,
-              name: event.stepName,
-              status: 'pending',
-            }
-            stepsRef.current.set(stepId, step)
-          }
-
-          // Status priority: pending=0, in-progress=1, done=2, failed=3
-          // Only update to 'done' if current status has lower priority
-          const statusPriority: Record<string, number> = {
-            'pending': 0,
-            'in-progress': 1,
-            'done': 2,
-            'failed': 3,
-          }
-          const currentPriority = statusPriority[step.status] ?? 0
-          const donePriority = statusPriority['done']
-
-          if (donePriority >= currentPriority) {
-            step.status = 'done'
-            step.activeForm = undefined
-            updateCurrentMessage({
-              steps: Array.from(stepsRef.current.values()),
-              contentBlocks: [...contentBlocksRef.current],
-            })
-          }
-          break
-        }
-
-        case 'CUSTOM': {
-          // Handle step_update custom event
-          if (event.name === 'step_update') {
-            const { stepName, status, activeForm } = event.value
-            const stepId = stepName // Use stepName as ID for lookup
-            let step = stepsRef.current.get(stepId)
-
-            // Create step if it doesn't exist (tolerate out-of-order events)
-            if (!step) {
-              ensureAssistantMessage()
-              if (!hasStepsBlockRef.current) {
-                hasStepsBlockRef.current = true
-                contentBlocksRef.current.push({ type: 'steps', id: 'steps' })
-              }
-              step = {
-                id: stepId,
-                name: stepName,
-                status: 'pending',
-              }
-              stepsRef.current.set(stepId, step)
-            }
-
-            // State priority: failed > done > in-progress > pending
-            // Only update if new status has higher or equal priority
-            const statusPriority: Record<string, number> = {
-              'pending': 0,
-              'in-progress': 1,
-              'done': 2,
-              'failed': 3,
-            }
-
-            const newStatus = status === 'in_progress' ? 'in-progress' : status
-            const currentPriority = statusPriority[step.status] ?? 0
-            const newPriority = statusPriority[newStatus] ?? 0
-
-            if (newPriority >= currentPriority) {
-              step.status = newStatus as Step['status']
-              step.activeForm = activeForm || undefined
-              updateCurrentMessage({
-                steps: Array.from(stepsRef.current.values()),
-                contentBlocks: [...contentBlocksRef.current],
-              })
-            }
-          }
-          break
-        }
-
-        case 'RUN_ERROR': {
-          // Create an error message for display
-          ensureAssistantMessage()
+        if (newPriority >= currentPriority) {
+          step.status = newStatus as Step['status']
+          step.activeForm = activeForm || undefined
           updateCurrentMessage({
-            isStreaming: false,
-            error: {
-              title: 'Error',
-              body: event.message,
-            },
+            steps: Array.from(stepsRef.current.values()),
+            contentBlocks: [...contentBlocksRef.current],
           })
-          // Reset refs for next run
-          currentMessageRef.current = null
-          toolCallsRef.current.clear()
-          stepsRef.current.clear()
-          contentBlocksRef.current = []
-          currentTextBlockIdRef.current = null
-          hasStepsBlockRef.current = false
-          hasToolsBlockRef.current = false
-          setError(event.message)
-          setRunActive(false)
-          setIsStreaming(false)
-          break
-        }
-
-        case 'RUN_FINISHED': {
-          // Finalize the current message and reset for next run
-          updateCurrentMessage({ isStreaming: false })
-          currentMessageRef.current = null
-          toolCallsRef.current.clear()
-          stepsRef.current.clear()
-          contentBlocksRef.current = []
-          currentTextBlockIdRef.current = null
-          hasStepsBlockRef.current = false
-          hasToolsBlockRef.current = false
-          setRunActive(false)
-          setIsStreaming(false)
-          break
         }
       }
     },
-    [ensureAssistantMessage, updateCurrentMessage]
-  )
+
+    onRunErrorEvent: ({ event }) => {
+      ensureAssistantMessage()
+      updateCurrentMessage({
+        isStreaming: false,
+        error: {
+          title: 'Error',
+          body: event.message,
+        },
+      })
+      // Reset refs for next run
+      currentMessageRef.current = null
+      toolCallsRef.current.clear()
+      stepsRef.current.clear()
+      contentBlocksRef.current = []
+      currentTextBlockIdRef.current = null
+      hasStepsBlockRef.current = false
+      hasToolsBlockRef.current = false
+      setError(event.message)
+      setRunActive(false)
+      setIsStreaming(false)
+    },
+
+    onRunFinishedEvent: () => {
+      // Finalize the current message and reset for next run
+      updateCurrentMessage({ isStreaming: false })
+      currentMessageRef.current = null
+      toolCallsRef.current.clear()
+      stepsRef.current.clear()
+      contentBlocksRef.current = []
+      currentTextBlockIdRef.current = null
+      hasStepsBlockRef.current = false
+      hasToolsBlockRef.current = false
+      setRunActive(false)
+      setIsStreaming(false)
+    },
+  }}, [ensureAssistantMessage, updateCurrentMessage])
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -356,74 +336,50 @@ export function useAgUiStream(
       setIsStreaming(true)
       setError(null)
 
-      abortControllerRef.current = new AbortController()
-
       try {
-        const requestBody = {
-          threadId: `thread-${Date.now()}`,
-          runId: `run-${Date.now()}`,
-          messages: [...messages, userMessage].map((m) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-          })),
-          state: {},
+        // Prepare messages for ag-ui format
+        const agUiMessages = [...messages, userMessage].map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+        }))
+
+        // Set messages on agent
+        agent.setMessages(agUiMessages)
+
+        const runId = `run-${Date.now()}`
+
+        // Log what will be sent (HttpAgent builds the full request internally)
+        console.log('[AG-UI] OUT:', JSON.stringify({
+          threadId: agent.threadId,
+          runId,
+          messages: agUiMessages,
+          state: agent.state,
           tools: [],
           context: [],
           forwardedProps: {},
-        }
-        console.log('[AG-UI] OUT:', JSON.stringify(requestBody))
+        }))
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'text/event-stream',
+        // Create subscriber and run agent
+        const subscriber = createSubscriber()
+
+        await agent.runAgent(
+          {
+            runId,
+            tools: [],
+            context: [],
+            forwardedProps: {},
           },
-          body: JSON.stringify(requestBody),
-          signal: abortControllerRef.current.signal,
-        })
-
-        if (!response.ok) {
-          throw new Error(`HTTP error: ${response.status}`)
-        }
-
-        const reader = response.body?.getReader()
-        if (!reader) {
-          throw new Error('No response body')
-        }
-
-        const decoder = new TextDecoder()
-        let buffer = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-
-          // Parse SSE events
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6)
-              if (data === '[DONE]') continue
-
-              try {
-                const event = JSON.parse(data) as AgUiEvent
-                console.log('[AG-UI] IN:', JSON.stringify(event))
-                handleEvent(event)
-              } catch {
-                console.warn('[AG-UI] Failed to parse event:', data)
-              }
-            }
+          {
+            ...subscriber,
+            // Log all events
+            onEvent: (params) => {
+              console.log('[AG-UI] IN:', JSON.stringify(params.event))
+            },
           }
-        }
+        )
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
-          // Create an error message for display
           ensureAssistantMessage()
           updateCurrentMessage({
             isStreaming: false,
@@ -447,7 +403,7 @@ export function useAgUiStream(
         setIsStreaming(false)
       }
     },
-    [endpoint, messages, handleEvent, ensureAssistantMessage, updateCurrentMessage]
+    [agent, messages, createSubscriber, ensureAssistantMessage, updateCurrentMessage]
   )
 
   const clearMessages = useCallback(() => {
