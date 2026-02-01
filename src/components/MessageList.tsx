@@ -315,6 +315,11 @@ interface MessageListProps {
   runActive: boolean
 }
 
+// Format assistant name with optional displayName
+function getAssistantName(displayName?: string): string {
+  return displayName ? `Assistant (${displayName})` : 'Assistant'
+}
+
 export function MessageList({ messages, isStreaming, runActive }: MessageListProps) {
   const scrollToBottomRef = useRef<HTMLDivElement>(null)
 
@@ -344,7 +349,7 @@ export function MessageList({ messages, isStreaming, runActive }: MessageListPro
             <Message
               key={message.id}
               role="bot"
-              name="Assistant"
+              name={getAssistantName(message.displayName)}
               avatar={patternflyAvatar}
               extraContent={{
                 beforeMainContent: (
@@ -370,7 +375,7 @@ export function MessageList({ messages, isStreaming, runActive }: MessageListPro
             <Message
               key={message.id}
               role={message.role === 'user' ? 'user' : 'bot'}
-              name={message.role === 'user' ? 'You' : 'Assistant'}
+              name={message.role === 'user' ? 'You' : getAssistantName(message.displayName)}
               avatar={message.role === 'user' ? userAvatar : patternflyAvatar}
               avatarProps={message.role === 'user' ? { isBordered: true } : undefined}
               extraContent={{
@@ -391,7 +396,7 @@ export function MessageList({ messages, isStreaming, runActive }: MessageListPro
           <Message
             key={message.id}
             role={message.role === 'user' ? 'user' : 'bot'}
-            name={message.role === 'user' ? 'You' : 'Assistant'}
+            name={message.role === 'user' ? 'You' : getAssistantName(message.displayName)}
             avatar={message.role === 'user' ? userAvatar : patternflyAvatar}
             avatarProps={message.role === 'user' ? { isBordered: true } : undefined}
             content={message.content || undefined}

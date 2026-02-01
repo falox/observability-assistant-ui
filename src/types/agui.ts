@@ -44,11 +44,20 @@ export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
+  displayName?: string // Custom display name from backend (e.g., "Prometheus Expert")
   isStreaming?: boolean
   toolCalls?: ToolCall[]
   steps?: Step[]
   contentBlocks?: ContentBlock[] // Ordered list of content blocks for rendering
   error?: MessageError // Error to display instead of content
+}
+
+// Extended TEXT_MESSAGE_START event with custom displayName field
+export interface ExtendedTextMessageStartEvent {
+  type: 'TEXT_MESSAGE_START'
+  messageId: string
+  role: 'assistant' | 'user'
+  displayName?: string // Custom field: backend can specify display name
 }
 
 export interface ToolCall {

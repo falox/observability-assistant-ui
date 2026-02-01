@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useMemo } from 'react'
 import { HttpAgent, type AgentSubscriber } from '@ag-ui/client'
-import type { ChatMessage, ToolCall, Step, ContentBlock, StepUpdatePayload } from '../types/agui'
+import type { ChatMessage, ToolCall, Step, ContentBlock, StepUpdatePayload, ExtendedTextMessageStartEvent } from '../types/agui'
 
 interface UseAgUiStreamOptions {
   endpoint?: string
@@ -104,13 +104,19 @@ export function useAgUiStream(
       setRunActive(true)
     },
 
-    onTextMessageStartEvent: () => {
+    onTextMessageStartEvent: ({ event }) => {
       ensureAssistantMessage()
+      // Capture custom displayName field if provided
+      const extendedEvent = event as ExtendedTextMessageStartEvent
+      if (extendedEvent.displayName && currentMessageRef.current) {
+        currentMessageRef.current.displayName = extendedEvent.displayName
+      }
       // Create a new text block
       const textBlockId = `text-${Date.now()}`
       currentTextBlockIdRef.current = textBlockId
       contentBlocksRef.current.push({ type: 'text', id: textBlockId, content: '' })
       updateCurrentMessage({
+        displayName: extendedEvent.displayName,
         contentBlocks: [...contentBlocksRef.current],
       })
     },
