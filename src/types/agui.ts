@@ -52,12 +52,12 @@ export interface ChatMessage {
   error?: MessageError // Error to display instead of content
 }
 
-// Extended TEXT_MESSAGE_START event with custom displayName field
-export interface ExtendedTextMessageStartEvent {
-  type: 'TEXT_MESSAGE_START'
-  messageId: string
-  role: 'assistant' | 'user'
-  displayName?: string // Custom field: backend can specify display name
+// Extended RUN_STARTED event with custom displayName field
+export interface ExtendedRunStartedEvent {
+  type: 'RUN_STARTED'
+  threadId: string
+  runId: string
+  displayName?: string // Custom field: backend can specify display name (e.g., "Prometheus Expert")
 }
 
 export interface ToolCall {

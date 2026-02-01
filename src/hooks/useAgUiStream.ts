@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useMemo } from 'react'
 import { HttpAgent, type AgentSubscriber } from '@ag-ui/client'
-import type { ChatMessage, ToolCall, Step, ContentBlock, StepUpdatePayload, ExtendedTextMessageStartEvent } from '../types/agui'
+import type { ChatMessage, ToolCall, Step, ContentBlock, StepUpdatePayload, ExtendedRunStartedEvent } from '../types/agui'
 
 interface UseAgUiStreamOptions {
   endpoint?: string
@@ -32,6 +32,7 @@ export function useAgUiStream(
   const currentTextBlockIdRef = useRef<string | null>(null)
   const hasStepsBlockRef = useRef(false)
   const hasToolsBlockRef = useRef(false)
+  const displayNameRef = useRef<string | undefined>(undefined)
 
   // Create HttpAgent instance with a unique threadId
   const agent = useMemo(() => {
@@ -48,6 +49,7 @@ export function useAgUiStream(
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: '',
+        displayName: displayNameRef.current,
         isStreaming: true,
         toolCalls: [],
         steps: [],
@@ -100,23 +102,20 @@ export function useAgUiStream(
     }
 
     return {
-    onRunStartedEvent: () => {
+    onRunStartedEvent: ({ event }) => {
+      // Capture custom displayName field if provided
+      const extendedEvent = event as ExtendedRunStartedEvent
+      displayNameRef.current = extendedEvent.displayName
       setRunActive(true)
     },
 
-    onTextMessageStartEvent: ({ event }) => {
+    onTextMessageStartEvent: () => {
       ensureAssistantMessage()
-      // Capture custom displayName field if provided
-      const extendedEvent = event as ExtendedTextMessageStartEvent
-      if (extendedEvent.displayName && currentMessageRef.current) {
-        currentMessageRef.current.displayName = extendedEvent.displayName
-      }
       // Create a new text block
       const textBlockId = `text-${Date.now()}`
       currentTextBlockIdRef.current = textBlockId
       contentBlocksRef.current.push({ type: 'text', id: textBlockId, content: '' })
       updateCurrentMessage({
-        displayName: extendedEvent.displayName,
         contentBlocks: [...contentBlocksRef.current],
       })
     },
@@ -309,6 +308,7 @@ export function useAgUiStream(
       currentTextBlockIdRef.current = null
       hasStepsBlockRef.current = false
       hasToolsBlockRef.current = false
+      displayNameRef.current = undefined
       setError(event.message)
       setRunActive(false)
       setIsStreaming(false)
@@ -324,6 +324,7 @@ export function useAgUiStream(
       currentTextBlockIdRef.current = null
       hasStepsBlockRef.current = false
       hasToolsBlockRef.current = false
+      displayNameRef.current = undefined
       setRunActive(false)
       setIsStreaming(false)
     },
@@ -402,6 +403,7 @@ export function useAgUiStream(
           currentTextBlockIdRef.current = null
           hasStepsBlockRef.current = false
           hasToolsBlockRef.current = false
+          displayNameRef.current = undefined
           setError(err.message)
           setRunActive(false)
         }
