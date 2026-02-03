@@ -73,12 +73,19 @@ All fields are required per ag-ui spec:
 
 ## Backend Configuration
 
-Edit proxy target in `vite.config.ts`:
+Set backend URL via environment variable or edit `vite.config.ts`:
+
+```bash
+# Using environment variable (recommended)
+AGUI_BACKEND_URL=http://localhost:5050 make dev
+```
+
+Or edit proxy target in `vite.config.ts` (defaults to `http://localhost:9010`):
 
 ```typescript
 proxy: {
   '/api': {
-    target: 'http://localhost:5050',  // Change port here
+    target: process.env.AGUI_BACKEND_URL || 'http://localhost:9010',
     changeOrigin: true,
   },
 }

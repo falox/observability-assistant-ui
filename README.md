@@ -49,12 +49,19 @@ make clean      # Remove dist/ and node_modules/
 
 ## Backend Proxy
 
-Configure the backend URL in `vite.config.ts`:
+Set backend URL via environment variable or edit `vite.config.ts`:
+
+```bash
+# Using environment variable (recommended)
+AGUI_BACKEND_URL=http://localhost:5050 make dev
+```
+
+Or edit proxy target in `vite.config.ts` (defaults to `http://localhost:9010`):
 
 ```ts
 proxy: {
   '/api': {
-    target: 'http://localhost:5050',
+    target: process.env.AGUI_BACKEND_URL || 'http://localhost:9010',
     changeOrigin: true,
   },
 }
